@@ -1,9 +1,12 @@
-export const BASE_URL = 'https://www.abhinavgoldandsilver.com/api'; 
+export const BASE_URL = 'https://abhinav-apk.vercel.app/api'; 
 
 export const API_ENDPOINTS = {
-  LIVERATES: `${BASE_URL}/rates/live`,
-  SETTINGS: `${BASE_URL}/rates/settings`,
+  RATES: `${BASE_URL}/rates`,
+  SETTINGS: `${BASE_URL}/settings`,
+  LOGIN: `${BASE_URL}/login`,
   VIDEOS: `${BASE_URL}/videos`,
+  ALERTS: `${BASE_URL}/alerts`,
+  MEDIA: `${BASE_URL}/media`,
 };
 
 export const ADMIN_PASSWORD = 'admin123';

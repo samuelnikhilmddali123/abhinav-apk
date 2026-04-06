@@ -19,7 +19,7 @@ const TABS = [
 
 export default function AdminDashboard() {
   const router = useRouter();
-  const { adminSettings, updateSetting, updateRateMod, updateRatesPageMod } = useAdmin();
+  const { adminSettings, updateSetting, updateRateMod, updateRatesPageMod, fetchSettings } = useAdmin();
   const [activeTab, setActiveTab] = useState('rates');
 
   const handleLogout = () => {
@@ -76,7 +76,7 @@ export default function AdminDashboard() {
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : null} style={{ flex: 1 }}>
           <View style={styles.mainContainer}>
             <View style={styles.contentArea}>
-              {activeTab === 'rates' && <RatesTab adminSettings={adminSettings} updateRateMod={updateRateMod} updateSetting={updateSetting} updateRatesPageMod={updateRatesPageMod} />}
+              {activeTab === 'rates' && <RatesTab adminSettings={adminSettings} updateRateMod={updateRateMod} updateSetting={updateSetting} updateRatesPageMod={updateRatesPageMod} fetchSettings={fetchSettings} />}
               {activeTab === 'news' && <NewsTab adminSettings={adminSettings} updateSetting={updateSetting} />}
               {activeTab === 'media' && <MediaTab adminSettings={adminSettings} updateSetting={updateSetting} />}
               {activeTab === 'market' && <MarketTab adminSettings={adminSettings} updateSetting={updateSetting} />}
@@ -91,7 +91,7 @@ export default function AdminDashboard() {
 
 /* --- TAB COMPONENTS --- */
 
-const RatesTab = ({ adminSettings, updateRateMod, updateSetting, updateRatesPageMod }) => {
+const RatesTab = ({ adminSettings, updateRateMod, updateSetting, updateRatesPageMod, fetchSettings }) => {
   const mods = adminSettings.rateModifications;
   
   // Mock live prices for display consistency with screenshots
@@ -205,7 +205,7 @@ const RatesTab = ({ adminSettings, updateRateMod, updateSetting, updateRatesPage
           />
       </View>
 
-      <TouchableOpacity style={styles.refreshBtn}>
+      <TouchableOpacity style={styles.refreshBtn} onPress={fetchSettings}>
           <MaterialCommunityIcons name="refresh" size={20} color="#F9D342" style={{marginRight: 10}} />
           <Text style={styles.refreshBtnText}>FORCE MANUAL REFRESH</Text>
       </TouchableOpacity>

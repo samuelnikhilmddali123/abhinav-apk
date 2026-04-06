@@ -26,8 +26,10 @@ import { useAdmin } from '../../context/AdminContext';
 import YoutubePlayer from "react-native-youtube-iframe";
 
 const { width, height: SCREEN_H } = Dimensions.get('window');
-const ITEM_WIDTH = width * 0.75;
-const CARD_WIDTH = width * 0.68;
+const IS_ANDROID = Platform.OS === 'android';
+/** Slide width — slightly narrow so more neighbors peek in (stacked deck). */
+const ITEM_WIDTH = width * 0.68;
+const CARD_WIDTH = width * 0.62;
 const EMPTY_ITEM_SIZE = (width - ITEM_WIDTH) / 2;
 
 const GOLD = '#FBBF24';
@@ -74,33 +76,47 @@ function CarouselItem({ item, index, scrollX, isPlaying, onPlay }) {
   const animatedCardStyle = useAnimatedStyle(() => {
     const centerPos = (index - 1) * ITEM_WIDTH;
     const distance = scrollX.value - centerPos;
-    const relPos = distance / ITEM_WIDTH; // 0=center, 1=left, -1=right
+    const relPos = distance / ITEM_WIDTH; // 0=center, +1=left on screen, -1=right
 
-    const inputRange = [-2, -1, 0, 1, 2];
+    const inputRange = [-3, -2, -1, 0, 1, 2, 3];
 
-    // More pronounced scale for center focus
-    const scale = interpolate(relPos, inputRange, [0.45, 0.7, 1, 0.7, 0.45], "clamp");
-    // Ensure center stays fully opaque for a longer range (up to 0.3 distance)
-    const opacity = interpolate(Math.abs(relPos), [0, 0.25, 0.75, 1.2], [1, 1, 0.65, 0.4], "clamp");
-
-    // rotateY matching website: Prev (relPos=1): 25, Next (relPos=-1): -25
-    const rotateY = interpolate(relPos, inputRange, [40, 22, 0, -22, -40], "clamp");
-
-    // Stacking logic: pulling cards towards the center to overlap behind
-    const translateX = interpolate(
+    // Depth: center full size; neighbors ~80–88%; farther cards smaller (matches stacked reference)
+    const scale = interpolate(
       relPos,
       inputRange,
-      [-1.2 * ITEM_WIDTH, -0.6 * ITEM_WIDTH, 0, 0.6 * ITEM_WIDTH, 1.2 * ITEM_WIDTH],
+      [0.48, 0.56, 0.82, 1, 0.82, 0.56, 0.48],
       "clamp"
     );
 
-    const zIndex = interpolate(Math.abs(relPos), [0, 0.1, 1], [100, 50, 10], "clamp");
-    const elevation = interpolate(Math.abs(relPos), [0, 1], [20, 5], "clamp");
-    const borderW = interpolate(Math.abs(relPos), [0, 0.1], [2.5, 0], "clamp");
+    const absR = Math.abs(relPos);
+    const opacity = interpolate(absR, [0, 0.12, 0.85, 1.4, 2.2, 3.2], [1, 1, 0.58, 0.5, 0.42, 0.36], "clamp");
+
+    // Gentler tilt — heavy rotateY widens the card’s projected hit-box and reads as “on top”
+    const rotateY = interpolate(relPos, inputRange, [22, 18, 9, 0, -9, -18, -22], "clamp");
+
+    // Push side cards *away* from screen center (opposite of “pull in”). Inward values made the
+    // right neighbor slide left onto the hero; on Android later FlatList rows + WebView then
+    // paint on top and the overlap reads as a bug.
+    const translateX = interpolate(
+      relPos,
+      inputRange,
+      [
+        0.78 * ITEM_WIDTH,
+        0.58 * ITEM_WIDTH,
+        0.32 * ITEM_WIDTH,
+        0,
+        -0.32 * ITEM_WIDTH,
+        -0.58 * ITEM_WIDTH,
+        -0.78 * ITEM_WIDTH,
+      ],
+      "clamp"
+    );
+
+    const borderW = interpolate(absR, [0, 0.14], [2.5, 0], "clamp");
 
     return {
       transform: [
-        { perspective: 1200 },
+        { perspective: 1400 },
         { translateX },
         { rotateY: `${rotateY}deg` },
         { scale },
@@ -108,36 +124,36 @@ function CarouselItem({ item, index, scrollX, isPlaying, onPlay }) {
       opacity,
       borderWidth: borderW,
       borderColor: GOLD,
-      zIndex: Math.round(zIndex),
-      ...(Platform.OS === 'android' ? { elevation: Math.round(elevation) } : {}),
     };
   });
 
   const dimOverlayStyle = useAnimatedStyle(() => {
     const centerPos = (index - 1) * ITEM_WIDTH;
     const relPos = (scrollX.value - centerPos) / ITEM_WIDTH;
-    const o = interpolate(Math.abs(relPos), [0, 1], [0, 0.62], "clamp");
+    const o = interpolate(Math.abs(relPos), [0, 0.15, 1.2], [0, 0.45, 0.72], "clamp");
     return { opacity: o };
   });
 
   const playStyle = useAnimatedStyle(() => {
     const centerPos = (index - 1) * ITEM_WIDTH;
     const relPos = (scrollX.value - centerPos) / ITEM_WIDTH;
-    const o = interpolate(Math.abs(relPos), [0.4, 0.8], [0, 1], "clamp");
+    // Reference: simple play on inactive stacks only; hide when card is focused
+    const o = interpolate(Math.abs(relPos), [0.22, 0.55], [0, 1], "clamp");
     return { opacity: o };
   });
 
   const activeChromeStyle = useAnimatedStyle(() => {
     const centerPos = (index - 1) * ITEM_WIDTH;
     const relPos = (scrollX.value - centerPos) / ITEM_WIDTH;
-    const o = interpolate(Math.abs(relPos), [0, 0.3], [1, 0], "clamp");
+    // Mute / expand chrome only when this slide is the hero thumbnail
+    const o = interpolate(Math.abs(relPos), [0, 0.22], [1, 0], "clamp");
     return { opacity: o };
   });
 
   const thumbStyle = useAnimatedStyle(() => {
     const centerPos = (index - 1) * ITEM_WIDTH;
     const relPos = (scrollX.value - centerPos) / ITEM_WIDTH;
-    const o = interpolate(Math.abs(relPos), [0, 1], [1, 0.75], "clamp");
+    const o = interpolate(Math.abs(relPos), [0, 1, 2.5], [1, 0.82, 0.72], "clamp");
     return { opacity: o };
   });
 
@@ -147,12 +163,14 @@ function CarouselItem({ item, index, scrollX, isPlaying, onPlay }) {
 
   return (
     <Animated.View
+      collapsable={false}
       style={[
         { width: ITEM_WIDTH, height: '100%', justifyContent: 'center', alignItems: 'center' },
         containerStyle,
       ]}
     >
       <Animated.View
+        collapsable={false}
         style={[
           styles.videoCard,
           { width: CARD_WIDTH },
@@ -168,7 +186,7 @@ function CarouselItem({ item, index, scrollX, isPlaying, onPlay }) {
                 play={true}
                 videoId={item.videoId}
                 initialPlayerParams={{
-                  controls: false, // Hide controls for a cleaner "reels" look
+                  controls: true,
                   loop: true,
                   modestbranding: true,
                   rel: false,
@@ -176,6 +194,9 @@ function CarouselItem({ item, index, scrollX, isPlaying, onPlay }) {
                 webViewProps={{
                   allowsFullscreenVideo: false,
                   androidLayerType: 'hardware',
+                  ...(IS_ANDROID
+                    ? { style: { elevation: 0, backgroundColor: '#000' } }
+                    : {}),
                 }}
                 onChangeState={(state) => {
                   if (state === "ended") onPlay(null);
@@ -244,12 +265,14 @@ function PaginationDot({ index, scrollX }) {
 function AnimatedCell({ children, index, scrollX, style, ...props }) {
   const cellStyle = useAnimatedStyle(() => {
     const centerPos = (index - 1) * ITEM_WIDTH;
-    const relPos = Math.abs((scrollX.value - centerPos) / ITEM_WIDTH);
-    // Absolute stacking priority: center item gets massive zIndex and elevation
-    const z = interpolate(relPos, [0, 0.35, 1], [3000, 1000, 100], "clamp");
+    const absR = Math.abs((scrollX.value - centerPos) / ITEM_WIDTH);
+    // Huge gap so the focused row always wins; non-focused rows use elevation 0 on Android so
+    // nested WebViews/thumbnails cannot outrank the hero cell in the native compositor.
+    const z = interpolate(absR, [0, 0.08, 0.2, 1, 2, 3], [80000, 72000, 400, 120, 60, 30], "clamp");
+    const elev = interpolate(absR, [0, 0.08, 0.2], [32, 28, 0], "clamp");
     return {
       zIndex: Math.round(z),
-      elevation: Math.round(z / 10),
+      elevation: IS_ANDROID ? Math.round(elev) : 0,
     };
   });
 

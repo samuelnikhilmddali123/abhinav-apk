@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { useRef, useEffect, useState } from 'react';
 import { MaterialCommunityIcons, FontAwesome5, Ionicons } from '@expo/vector-icons';
 import { useAdmin } from '../../context/AdminContext';
+import { API_ENDPOINTS } from '../../constants/Config';
 
 const { width } = Dimensions.get('window');
 
@@ -28,9 +29,23 @@ export default function AlertsScreen() {
     const fetchNews = async () => {
       try {
         const timestamp = Date.now();
-        const res = await fetch(`https://www.investing.com/rss/news_11.rss?_=${timestamp}`);
-        const text = await res.text();
+        // Priority: Production /alerts API
+        const res = await fetch(`${API_ENDPOINTS.ALERTS}?_=${timestamp}`);
         
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            setNews(data);
+            return;
+          } else if (data.alerts && Array.isArray(data.alerts)) {
+            setNews(data.alerts);
+            return;
+          }
+        }
+        
+        // Fallback to legacy RSS if backend is not yet providing alerts
+        const rssRes = await fetch(`https://www.investing.com/rss/news_11.rss?_=${timestamp}`);
+        const text = await rssRes.text();
         if (!text) return;
         const items = text.match(/<item>([\s\S]*?)<\/item>/g);
         if (!items) return;
@@ -39,27 +54,17 @@ export default function AlertsScreen() {
           const titleMatch = it.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/) || it.match(/<title>(.*?)<\/title>/);
           const title = titleMatch?.[1];
           const pubDate = it.match(/<pubDate>(.*?)<\/pubDate>/)?.[1];
-          
-          let dateStr = pubDate || '';
-          if (dateStr.includes('-')) {
-            const [y, m, dayParts] = dateStr.split('-');
-            const day = dayParts.split(' ')[0];
-            const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-            dateStr = `${day} ${monthNames[parseInt(m) - 1]} ${y}`;
-          }
-
           return {
             id: `news-${idx}`,
             title: title?.replace(/&amp;/g, '&'),
             msg: title?.replace(/&amp;/g, '&'),
-            date: dateStr,
+            date: pubDate || '',
             type: (title?.toLowerCase().includes('surge') || title?.toLowerCase().includes('fall')) ? 'urgent' : 'info'
           };
         }).slice(0, 10);
-
         setNews(parsed);
       } catch (error) {
-        console.log('Error fetching news:', error);
+        console.log('Error fetching alerts from backend/rss:', error);
       }
     };
 

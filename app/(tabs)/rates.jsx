@@ -3,6 +3,7 @@ import { StyleSheet, TouchableOpacity, Text, View, StatusBar, Image, Dimensions,
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LIVE_RATES_XML_URL, parseLiveRatesXml } from '../../constants/liveRates';
 import { useAdmin } from '../../context/AdminContext';
+import { API_ENDPOINTS } from '../../constants/Config';
 
 const { width } = Dimensions.get('window');
 const HEADER_IMAGE = require('../../assets/images/mobile-rates-header.webp');
@@ -36,9 +37,23 @@ export default function RatesScreen() {
       isFetchingRatesRef.current = true;
       try {
         const timestamp = Date.now();
-        const res = await fetch(`${LIVE_RATES_XML_URL}?_=${timestamp}`);
-        const text = await res.text();
-        const newRates = parseLiveRatesXml(text || '');
+        const res = await fetch(`${API_ENDPOINTS.RATES}?_=${timestamp}`);
+        let newRates = {};
+        
+        if (res.ok) {
+          const contentType = res.headers.get("content-type");
+          if (contentType && contentType.includes("application/json")) {
+            const data = await res.json();
+            if (data['945'] || data['gold']) {
+              newRates = data;
+            } else {
+              newRates = parseLiveRatesXml(data.text || '');
+            }
+          } else {
+            const text = await res.text();
+            newRates = parseLiveRatesXml(text || '');
+          }
+        }
         setRates(newRates);
         prevRatesRef.current = newRates;
       } catch (error) {

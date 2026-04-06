@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
+import { API_ENDPOINTS } from '../../constants/Config';
 
 const { width } = Dimensions.get('window');
 const BG_IMAGE = require('../../assets/images/bg-internal.jpg');
@@ -16,16 +17,40 @@ export default function AdminLogin() {
   const [username, setUsername] = useState('admin');
   const [password, setPassword] = useState('admin');
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     const user = username.trim().toLowerCase();
     const pass = password.trim();
 
-    // Any combination of admin/admin or admin/admin123 will work
-    if (user === 'admin' && (pass === 'admin' || pass === 'admin123' || pass === 'password')) {
-      console.log('Login successful, navigating...');
-      router.replace('/admin/dashboard');
-    } else {
-      alert('Invalid: Use admin / admin');
+    try {
+      const response = await fetch(API_ENDPOINTS.LOGIN, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: user, password: pass }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          console.log('Login successful, navigating...');
+          router.replace('/admin/dashboard');
+          return;
+        }
+      }
+      
+      // Fallback for demo/dev if API is not yet available
+      if (user === 'admin' && (pass === 'admin' || pass === 'admin123' || pass === 'password')) {
+        router.replace('/admin/dashboard');
+      } else {
+        alert('Invalid: Use admin / admin');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      // Fallback for offline/dev
+      if (user === 'admin' && (pass === 'admin' || pass === 'admin123')) {
+        router.replace('/admin/dashboard');
+      } else {
+        alert('Could not connect to live backend');
+      }
     }
   };
 
