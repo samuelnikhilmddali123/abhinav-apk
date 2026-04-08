@@ -34,7 +34,9 @@ export const AdminProvider = ({ children }) => {
 
   const fetchSettings = useCallback(async () => {
     try {
-      const response = await fetch(API_ENDPOINTS.SETTINGS);
+      const response = await fetch(`${API_ENDPOINTS.SETTINGS}?_=${Date.now()}`, {
+        cache: 'no-store',
+      });
       if (response.ok) {
         const data = await response.json();
         // Map backend structure to mobile app structure
@@ -96,11 +98,15 @@ export const AdminProvider = ({ children }) => {
         videos: updatedSettings.videos
       };
 
-      await fetch(API_ENDPOINTS.SETTINGS, {
+      const response = await fetch(API_ENDPOINTS.SETTINGS, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ settings: backendData }),
       });
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Failed to persist settings: ${response.status} ${errText}`);
+      }
     } catch (error) {
       console.error('Failed to save settings to backend:', error);
     }
