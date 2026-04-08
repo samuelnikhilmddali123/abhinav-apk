@@ -54,7 +54,7 @@ export const AdminProvider = ({ children }) => {
           ticker: data.ticker || "",
           marketStatus: {
             mode: data.marketStatus?.mode || 'regular',
-            overrideStatus: data.marketStatus?.modifiedStatus || 'open',
+            overrideStatus: data.marketStatus?.overrideStatus || data.marketStatus?.modifiedStatus || 'open',
             openTime: data.marketStatus?.openTime || '10:00 AM',
             closeTime: data.marketStatus?.closeTime || '08:00 PM',
           },
@@ -88,7 +88,7 @@ export const AdminProvider = ({ children }) => {
         ticker: updatedSettings.ticker,
         marketStatus: {
           mode: updatedSettings.marketStatus.mode,
-          modifiedStatus: updatedSettings.marketStatus.overrideStatus,
+          overrideStatus: updatedSettings.marketStatus.overrideStatus,
           openTime: updatedSettings.marketStatus.openTime,
           closeTime: updatedSettings.marketStatus.closeTime
         },

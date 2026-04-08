@@ -54,6 +54,18 @@ export default function RatesScreen() {
             newRates = parseLiveRatesXml(text || '');
           }
         }
+        // Fallback to direct XML feed when API is unavailable/empty.
+        if (!newRates || Object.keys(newRates).length === 0) {
+          const xmlRes = await fetch(`${LIVE_RATES_XML_URL}?_=${timestamp}`);
+          if (xmlRes.ok) {
+            const xmlText = await xmlRes.text();
+            newRates = parseLiveRatesXml(xmlText || '');
+          }
+        }
+        // Keep last known rates if both sources fail.
+        if (!newRates || Object.keys(newRates).length === 0) {
+          newRates = prevRatesRef.current || {};
+        }
         setRates(newRates);
         prevRatesRef.current = newRates;
       } catch (error) {

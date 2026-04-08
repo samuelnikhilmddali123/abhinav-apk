@@ -10,6 +10,36 @@ const RateSchema = new mongoose.Schema({
 
 const SettingSchema = new mongoose.Schema({
   key: { type: String, required: true, unique: true }, // 'global_settings'
+  baseModifications: {
+    gold999: {
+      mode: { type: String, default: 'amount' },
+      value: { type: Number, default: 0 }
+    },
+    silver999: {
+      mode: { type: String, default: 'amount' },
+      value: { type: Number, default: 0 }
+    }
+  },
+  goldOffset: {
+    mode: { type: String, default: 'amount' },
+    value: { type: Number, default: 0 }
+  },
+  silverOffset: {
+    mode: { type: String, default: 'amount' },
+    value: { type: Number, default: 0 }
+  },
+  showModified: { type: Boolean, default: false },
+  ratesPage: {
+    gold: {
+      mode: { type: String, default: 'amount' },
+      value: { type: Number, default: 0 }
+    },
+    silver: {
+      mode: { type: String, default: 'amount' },
+      value: { type: Number, default: 0 }
+    },
+    showModified: { type: Boolean, default: false }
+  },
   ticker: { type: String, default: "Welcome to Abhinav Gold & Silver - Quality Purity Guaranteed" },
   marketStatus: {
     mode: { type: String, default: 'regular' },
@@ -18,6 +48,7 @@ const SettingSchema = new mongoose.Schema({
     closeTime: { type: String, default: '08:00 PM' }
   },
   stockOverrides: { type: Object, default: {} },
+  videos: { type: Array, default: [] },
   updatedAt: { type: Date, default: Date.now }
 });
 
