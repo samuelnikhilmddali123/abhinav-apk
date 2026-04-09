@@ -12,10 +12,15 @@ if (!cached) {
 }
 
 async function dbConnect() {
-  const MONGODB_URI = process.env.MONGODB_URI;
+  const MONGODB_URI =
+    process.env.MONGODB_URI ||
+    process.env.MONGODB_URL ||
+    process.env.DATABASE_URL;
 
   if (!MONGODB_URI) {
-    throw new Error('Please define the MONGODB_URI environment variable inside .env.local or on Vercel Dashboard');
+    throw new Error(
+      'Missing MongoDB env var. Set one of: MONGODB_URI, MONGODB_URL, DATABASE_URL'
+    );
   }
 
   if (cached.conn) {

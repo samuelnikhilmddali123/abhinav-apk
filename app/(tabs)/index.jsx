@@ -1,15 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, Dimensions, StatusBar, ImageBackground, ScrollView, Animated, Easing } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { LIVE_RATES_XML_URL, parseLiveRatesXml } from '../../constants/liveRates';
-import { useAdmin } from '../../context/AdminContext';
+import * as Audio from 'expo-av/build/Audio';
+import { fetchRatesIdMap } from '../../constants/liveRates';
+import { useSettings } from '../../context/SettingsContext';
 import { API_ENDPOINTS } from '../../constants/Config';
 
 const { width } = Dimensions.get('window');
 const HEADER_IMAGE = require('../../assets/images/mobile-home-header.webp');
 const BG_IMAGE = require('../../assets/images/bg-home-mobile.webp');
 const TICKER_IMAGE = require('../../assets/images/bg-ticker.webp');
+const HOME_MUSIC = require('../../assets/images/music/home.mp3');
 const TICKER_TEXT = "✦   WELCOME TO ABHINAV GOLD & SILVER - QUALITY PURITY GUARANTEED   ";
 const imageSource = Image.resolveAssetSource(HEADER_IMAGE);
 const ASPECT_RATIO = imageSource.width / imageSource.height;
@@ -39,7 +42,7 @@ const SpotRateBox = ({ title, symbol, value, high, low, defaultColor = '#FFFFFF'
       <Text style={[styles.spotRateLabel, getLabelStyle()]}>{title}</Text>
       <View style={[styles.spotRateBox, getBoxStyle()]}>
         <View style={styles.priceContainer}>
-          <Text style={[styles.symbol, getTextStyle()]}>{symbol}</Text>
+          <Text style={[styles.symbol, getTextStyle()]}>{symbol}{symbol === '₹' ? ' ' : ''}</Text>
           <Text style={[styles.spotValue, getTextStyle()]}>{value || '--.--'}</Text>
         </View>
         <View style={styles.hlContainer}>
@@ -62,13 +65,13 @@ const LiveSpotRateRow = ({ product, sub, color, buy, sell, inStock = true, trend
   return (
     <View style={styles.liveRowCard}>
       <View style={{ flex: 1.5, paddingRight: 5 }}>
-        <Text style={[styles.retailProductTitle, { color: '#FFF' }]}>{product}</Text>
-        <Text style={[styles.retailProductWeight, { color: '#A0AEC0' }]}>{sub}</Text>
+        <Text style={[styles.retailProductTitle, { color: '#000' }]}>{product}</Text>
+        <Text style={[styles.retailProductWeight, { color: '#444' }]}>{sub}</Text>
       </View>
       <View style={{ flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingRight: 10 }}>
-        <View style={[styles.retailPill, { backgroundColor: getPillColor(), justifyContent: 'center', alignItems: 'center', flex: 1, height: 42, borderBottomWidth: 3, borderBottomColor: 'rgba(0,0,0,0.2)' }]}>
+        <View style={[styles.retailPill, { backgroundColor: getPillColor(), justifyContent: 'center', alignItems: 'center', flex: 1, height: 42, borderRadius: 21 }]}>
           <Text style={{fontWeight: '900', fontSize: 15, color: '#000'}}>
-            ₹{sell || buy || '--'}
+            ₹ {sell || buy || '--'}
           </Text>
         </View>
       </View>
@@ -82,26 +85,73 @@ const LiveSpotRateRow = ({ product, sub, color, buy, sell, inStock = true, trend
 };
 
 const MarketStatusBox = ({ status }) => {
-  const isMarketOpen = () => {
-    if (!status) return true;
-    if (status.mode === 'regular') {
-      const now = new Date();
-      const istTime = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
-      const hours = istTime.getHours();
-      return hours >= 10 && hours < 20;
+  // Match website logic (`abhanav-website/src/context/RateContext.jsx` getMarketStatus)
+  const parseTimeToMinutes = (t) => {
+    if (!t || typeof t !== 'string') return null;
+    const s = t.trim().toUpperCase();
+
+    // Supports both "10:00" and "10:00 AM" formats.
+    const m = s.match(/^(\d{1,2}):(\d{2})(?:\s*(AM|PM))?$/);
+    if (!m) return null;
+    let hh = Number(m[1]);
+    const mm = Number(m[2]);
+    const ap = m[3];
+    if (Number.isNaN(hh) || Number.isNaN(mm)) return null;
+    if (mm < 0 || mm > 59) return null;
+    if (ap) {
+      hh = hh % 12;
+      if (ap === 'PM') hh += 12;
     }
-    // Handle manual overrides (mode === 'modified')
-    return status.overrideStatus === 'open';
+    if (hh < 0 || hh > 23) return null;
+    return hh * 60 + mm;
   };
 
-  const isOpen = isMarketOpen();
+  const getMarket = () => {
+    const cfg = status || {};
+      const now = new Date();
+
+    // Sunday check in IST
+    const istDay = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Kolkata',
+      weekday: 'short',
+    }).format(now);
+
+    if (istDay === 'Sun') {
+      return { isOpen: false, message: 'MARKET CLOSED (SUNDAY)' };
+    }
+
+    // Current IST time in minutes
+    const istTime = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Asia/Kolkata',
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: false,
+    }).format(now);
+
+    const [hStr, mStr] = String(istTime).split(':');
+    const curMin = Number(hStr) * 60 + Number(mStr);
+
+    if (cfg.mode === 'modified') {
+      const openMin = parseTimeToMinutes(cfg.openTime) ?? 600;
+      const closeMin = parseTimeToMinutes(cfg.closeTime) ?? 1200;
+      const timeRangeOpen = curMin >= openMin && curMin < closeMin;
+      const isOpen = (cfg.overrideStatus || cfg.modifiedStatus) === 'open' && timeRangeOpen;
+      return { isOpen, message: isOpen ? 'MARKET OPEN' : 'MARKET CLOSED' };
+    }
+
+    // Regular hours: 10:00–20:00 IST
+    const isOpen = curMin >= 600 && curMin < 1200;
+    return { isOpen, message: isOpen ? 'MARKET OPEN' : 'MARKET CLOSED' };
+  };
+
+  const market = getMarket();
 
   return (
-    <View style={[styles.marketStatusButton, !isOpen && { backgroundColor: 'rgba(248, 113, 113, 0.1)', borderColor: '#f87171' }]}>
+    <View style={[styles.marketStatusButton, !market.isOpen && { backgroundColor: 'rgba(248, 113, 113, 0.1)', borderColor: '#f87171' }]}>
       <View style={styles.marketStatusTopRow}>
-        <View style={[styles.marketStatusDot, !isOpen && { backgroundColor: '#f87171' }]} />
-        <Text style={[styles.marketStatusTitle, !isOpen && { color: '#f87171' }]}>
-          {isOpen ? 'MARKET OPEN' : 'MARKET CLOSED'}
+        <View style={[styles.marketStatusDot, !market.isOpen && { backgroundColor: '#f87171' }]} />
+        <Text style={[styles.marketStatusTitle, !market.isOpen && { color: '#f87171' }]}>
+          {market.message}
         </Text>
       </View>
       <Text style={styles.marketStatusTime}>
@@ -128,13 +178,13 @@ const RetailRateRow = ({ product, weight, unit, color, hiLoColor, buy, sell, hi,
       
       <View style={styles.retailPillCol}>
         <View style={[styles.retailPill, { backgroundColor: getPillColor(), justifyContent: 'center', alignItems: 'center' }]}>
-          <Text style={{fontWeight: '900', fontSize: 13, color: '#000'}}>₹{buy || '--'}</Text>
+          <Text style={{fontWeight: '900', fontSize: 13, color: '#000'}}>₹ {buy || '--'}</Text>
         </View>
       </View>
       
       <View style={styles.retailPillCol}>
         <View style={[styles.retailPill, { backgroundColor: getPillColor(), justifyContent: 'center', alignItems: 'center' }]}>
-          <Text style={{fontWeight: '900', fontSize: 13, color: '#000'}}>₹{sell || '--'}</Text>
+          <Text style={{fontWeight: '900', fontSize: 13, color: '#000'}}>₹ {sell || '--'}</Text>
         </View>
       </View>
     
@@ -142,12 +192,12 @@ const RetailRateRow = ({ product, weight, unit, color, hiLoColor, buy, sell, hi,
         <View style={[styles.retailHiLoBox, { backgroundColor: hiLoColor }]}>
           <View style={styles.retailHiLoInnerRow}>
             <Text style={styles.retailHiText}>HI</Text>
-            <Text style={{fontWeight: '900', fontSize: 10, color: '#000', marginLeft: 6}}>₹{hi || '--'}</Text>
+            <Text style={{fontWeight: '900', fontSize: 10, color: '#000', marginLeft: 6}}>₹ {hi || '--'}</Text>
           </View>
           <View style={styles.retailHiLoDivider} />
           <View style={styles.retailHiLoInnerRow}>
             <Text style={styles.retailLoText}>LO</Text>
-            <Text style={{fontWeight: '900', fontSize: 10, color: '#000', marginLeft: 6}}>₹{lo || '--'}</Text>
+            <Text style={{fontWeight: '900', fontSize: 10, color: '#000', marginLeft: 6}}>₹ {lo || '--'}</Text>
           </View>
         </View>
       </View>
@@ -158,12 +208,16 @@ const RetailRateRow = ({ product, weight, unit, color, hiLoColor, buy, sell, hi,
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const scrollX = useRef(new Animated.Value(0)).current;
-  const { adminSettings } = useAdmin();
+  const { settings } = useSettings();
   const [tickerWidth, setTickerWidth] = useState(0);
   const [rates, setRates] = useState({});
   const [trends, setTrends] = useState({});
+  const [isMusicOn, setIsMusicOn] = useState(false);
   const prevRatesRef = useRef({});
   const isFetchingRatesRef = useRef(false);
+  // Website parity: RTGS HI/LO is session-local, calculated from live sell(ask) updates.
+  const sessionHighLowRef = useRef({});
+  const soundRef = useRef(null);
 
 
 
@@ -172,41 +226,13 @@ export default function HomeScreen() {
       if (isFetchingRatesRef.current) return;
       isFetchingRatesRef.current = true;
       try {
-        const timestamp = Date.now();
-        // Use production /rates API
-        const res = await fetch(`${API_ENDPOINTS.RATES}?_=${timestamp}`);
-        let newRates = {};
-        
-        if (res.ok) {
-          const contentType = res.headers.get("content-type");
-          if (contentType && contentType.includes("application/json")) {
-            const data = await res.json();
-            // If the data already contains the numeric keys (945/2966), use it directly
-            if (data['945'] || data['gold']) {
-              newRates = data;
-            } else {
-              newRates = parseLiveRatesXml(data.text || '');
-            }
-          } else {
-            const text = await res.text();
-            newRates = parseLiveRatesXml(text || '');
-          }
-        }
+        // Same pipeline as abhanav-website: raw bcast text → whitespace parse (see liveRates.js),
+        // fallback to `/api/rates/live` Mongo snapshot. Avoids mismatch with legacy `/api/rates` JSON.
+        let newRates = await fetchRatesIdMap(API_ENDPOINTS.RATES_LIVE);
 
-        // Fallback to direct XML feed when API is unavailable/empty.
-        if (!newRates || Object.keys(newRates).length === 0) {
-          const xmlRes = await fetch(`${LIVE_RATES_XML_URL}?_=${timestamp}`);
-          if (xmlRes.ok) {
-            const xmlText = await xmlRes.text();
-            newRates = parseLiveRatesXml(xmlText || '');
-          }
-        }
-
-        // Keep last known rates if both sources fail.
         if (!newRates || Object.keys(newRates).length === 0) {
           newRates = prevRatesRef.current || {};
         }
-        const now = Date.now();
 
         // Compute trend fresh each fetch:
         // - If price increased => green
@@ -217,7 +243,7 @@ export default function HomeScreen() {
         // displayed value is stable, we clear the trend and the box returns
         // to its default (gold/silver).
         const spotIds = { '3103': true, '3101': true, '3107': true };
-        const pillIds = { '945': true, '2966': true };
+        const pillIds = { '945': true, '2966': true, '2987': true };
 
         const nextTrends = {};
 
@@ -243,6 +269,24 @@ export default function HomeScreen() {
         });
 
         setTrends(nextTrends);
+
+        // Match website RateContext:
+        // for RTGS ids, HI/LO is tracked in-session from latest sell (ask).
+        ['945', '2966', '2987'].forEach((id) => {
+          const sell = parseFloat(String(newRates[id]?.ask ?? '').replace(/\r/g, '').trim());
+          if (isNaN(sell)) return;
+
+          const current = sessionHighLowRef.current[id] || { high: -Infinity, low: Infinity };
+          if (sell > current.high) current.high = sell;
+          if (sell < current.low) current.low = sell;
+          sessionHighLowRef.current[id] = current;
+
+          newRates[id] = {
+            ...(newRates[id] || {}),
+            high: String(current.high),
+            low: String(current.low),
+          };
+        });
 
         setRates(newRates);
         prevRatesRef.current = newRates;
@@ -275,7 +319,71 @@ export default function HomeScreen() {
   // Reset ticker width when text changes to force re-calculation
   useEffect(() => {
     setTickerWidth(0);
-  }, [adminSettings.ticker]);
+  }, [settings.ticker]);
+
+  const stopAndResetMusic = React.useCallback(async () => {
+    const snd = soundRef.current;
+    soundRef.current = null;
+    if (snd) {
+      try {
+        await snd.stopAsync();
+      } catch {}
+      try {
+        await snd.unloadAsync();
+      } catch {}
+    }
+    setIsMusicOn(false);
+  }, []);
+
+  const startMusic = React.useCallback(async () => {
+    try {
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        shouldDuckAndroid: true,
+        staysActiveInBackground: false,
+      });
+      const { sound } = await Audio.Sound.createAsync(HOME_MUSIC, {
+        shouldPlay: true,
+        isLooping: true,
+        volume: 1.0,
+      });
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (!status.isLoaded && status.error) {
+          console.log('Home music playback error:', status.error);
+        }
+      });
+      soundRef.current = sound;
+      setIsMusicOn(true);
+    } catch (e) {
+      console.log('Home music start failed:', e);
+      await stopAndResetMusic();
+    }
+  }, [stopAndResetMusic]);
+
+  const toggleMusic = React.useCallback(async () => {
+    if (isMusicOn) {
+      await stopAndResetMusic();
+      return;
+    }
+    // Immediate UI feedback on tap.
+    setIsMusicOn(true);
+    await startMusic();
+  }, [isMusicOn, stopAndResetMusic, startMusic]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      return () => {
+        void stopAndResetMusic();
+      };
+    }, [stopAndResetMusic])
+  );
+
+  useEffect(() => {
+    return () => {
+      void stopAndResetMusic();
+    };
+  }, [stopAndResetMusic]);
 
   const formatPrice = (val, multiplier = 1, type = 'none') => {
     // Treat only explicit "missing" values as empty. "0" is valid.
@@ -289,14 +397,16 @@ export default function HomeScreen() {
       return base + v;
     };
 
-    const mods = adminSettings.rateModifications;
+    const mods = settings.rateModifications;
 
-    if (mods?.isModifiedMode) {
-      if (type === 'gold' || type === 'spot_gold') {
+    // Website Hero "LIVE SPOT RATES" uses `rawRates.rtgs` — no admin offsets (only `rates.rtgs` is adjusted).
+    // Type `live_rtgs` matches that raw pill: sell × factor, integer rupees (see Hero.jsx).
+    if (mods?.isModifiedMode && !String(type).startsWith('spot') && type !== 'live_rtgs') {
+      if (type === 'gold') {
         num = applyOffset(num, mods.gold999_buy);
       } else if (type === 'gold999') {
         num = applyOffset(num, mods.gold999_sell);
-      } else if (type === 'silver' || type === 'spot_silver') {
+      } else if (type === 'silver') {
         num = applyOffset(num, mods.silver999_buy);
       } else if (type === 'silver999') {
         num = applyOffset(num, mods.silver999_sell);
@@ -307,6 +417,9 @@ export default function HomeScreen() {
     let options = { maximumFractionDigits: type === 'none' ? 4 : 0 };
     if (type.startsWith('spot')) {
       options = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
+    }
+    if (type === 'live_rtgs') {
+      options = { maximumFractionDigits: 0 };
     }
     return num.toLocaleString('en-IN', options);
   };
@@ -371,10 +484,10 @@ export default function HomeScreen() {
               buy={formatPrice(
                 rates['945']?.bid && rates['945']?.bid !== '-' ? rates['945']?.bid : rates['945']?.ask,
                 10,
-                'gold'
+                'live_rtgs'
               )} 
-              sell={formatPrice(rates['945']?.ask, 10, 'gold999')}
-              inStock={adminSettings.stockStatus['gold999'] !== false}
+              sell={formatPrice(rates['945']?.ask, 10, 'live_rtgs')}
+              inStock={settings.stockStatus['gold999'] !== false}
               trend={trends['945']?.type}
             />
             <LiveSpotRateRow 
@@ -384,10 +497,10 @@ export default function HomeScreen() {
               buy={formatPrice(
                 rates['2966']?.bid && rates['2966']?.bid !== '-' ? rates['2966']?.bid : rates['2966']?.ask,
                 1,
-                'silver'
+                'live_rtgs'
               )} 
-              sell={formatPrice(rates['2966']?.ask, 1, 'silver999')}
-              inStock={adminSettings.stockStatus['silver999'] !== false}
+              sell={formatPrice(rates['2966']?.ask, 1, 'live_rtgs')}
+              inStock={settings.stockStatus['silver999'] !== false}
               trend={trends['2966']?.type}
             />
           </View>
@@ -406,17 +519,17 @@ export default function HomeScreen() {
                   }}
                   style={styles.tickerText}
                 >
-                  {adminSettings.ticker}
+                  {settings.ticker}
                 </Text>
                 {Array.from({ length: 15 }).map((_, i) => (
-                  <Text key={i} style={styles.tickerText}>{adminSettings.ticker}</Text>
+                  <Text key={i} style={styles.tickerText}>{settings.ticker}</Text>
                 ))}
               </Animated.View>
             </ImageBackground>
           </View>
           
           <View style={styles.marketStatusContainer}>
-            <MarketStatusBox status={adminSettings.marketStatus} />
+            <MarketStatusBox status={settings.marketStatus} />
           </View>
           
           <View style={styles.retailTableSection}>
@@ -445,8 +558,8 @@ export default function HomeScreen() {
                    'gold'
                  )} 
                  sell={formatPrice(rates['945']?.ask, 1, 'gold999')} 
-                 hi={formatPrice(rates['945']?.high, 1, 'gold999')} 
-                 lo={formatPrice(rates['945']?.low, 1, 'gold999')} 
+                 hi={formatPrice(rates['945']?.high, 1, 'live_rtgs')} 
+                 lo={formatPrice(rates['945']?.low, 1, 'live_rtgs')} 
                  trend={trends['945']?.type}
               />
                <RetailRateRow 
@@ -461,11 +574,17 @@ export default function HomeScreen() {
                     'silver'
                   )} 
                   sell={formatPrice(rates['2966']?.ask, 1, 'silver999')} 
-                  hi={formatPrice(rates['2966']?.high, 1, 'silver999')} 
-                  lo={formatPrice(rates['2966']?.low, 1, 'silver999')} 
+                  hi={formatPrice(rates['2966']?.high, 1, 'live_rtgs')} 
+                  lo={formatPrice(rates['2966']?.low, 1, 'live_rtgs')} 
                   trend={trends['2966']?.type}
                />
             </View>
+          </View>
+
+          <View style={styles.musicButtonWrap}>
+            <TouchableOpacity style={styles.musicButton} onPress={toggleMusic} activeOpacity={0.8} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Text style={styles.musicButtonText}>{isMusicOn ? 'MUSIC ON' : 'MUSIC OFF'}</Text>
+            </TouchableOpacity>
           </View>
 
         </ScrollView>
@@ -696,10 +815,8 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   retailTableCard: {
-    backgroundColor: 'rgba(255,255,255,0.7)',
-    borderRadius: 20,
-    padding: 15,
-    paddingBottom: 0,
+    paddingTop: 10,
+    paddingHorizontal: 5,
   },
   retailRow: {
     flexDirection: 'row',
@@ -733,7 +850,7 @@ const styles = StyleSheet.create({
   retailPill: {
     borderWidth: 2,
     borderColor: '#000',
-    borderRadius: 15,
+    borderRadius: 24,
     height: 48,
   },
   retailHiLoCol: {
@@ -743,7 +860,7 @@ const styles = StyleSheet.create({
   retailHiLoBox: {
     borderWidth: 2,
     borderColor: '#000',
-    borderRadius: 15,
+    borderRadius: 24,
     height: 48, 
     justifyContent: 'center',
     paddingHorizontal: 8,
@@ -767,6 +884,26 @@ const styles = StyleSheet.create({
     backgroundColor: '#000', 
     marginVertical: 4,
     opacity: 0.1,
+  },
+  musicButtonWrap: {
+    width: '100%',
+    alignItems: 'center',
+    marginTop: 10,
+    marginBottom: 20,
+  },
+  musicButton: {
+    backgroundColor: '#e5e7eb',
+    borderRadius: 28,
+    borderWidth: 2,
+    borderColor: '#cbd5e1',
+    paddingHorizontal: 34,
+    paddingVertical: 14,
+  },
+  musicButtonText: {
+    color: '#334155',
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
   spotRateWrapper: {
     flex: 1,

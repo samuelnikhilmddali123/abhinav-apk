@@ -16,7 +16,10 @@ export default async function handler(req, res) {
   try {
     await dbConnect();
   } catch (error) {
-    return res.status(500).json({ error: 'DB Connection Failed' });
+    return res.status(500).json({
+      error: 'DB Connection Failed',
+      message: error?.message || 'Unknown DB connection error',
+    });
   }
 
   if (req.method === 'GET') {

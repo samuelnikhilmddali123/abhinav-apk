@@ -6,7 +6,7 @@ import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/components/useColorScheme';
-import { AdminProvider } from '../context/AdminContext';
+import { SettingsProvider } from '../context/SettingsContext';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -48,14 +48,13 @@ function RootLayoutNav() {
   const colorScheme = useColorScheme();
 
   return (
-    <AdminProvider>
+    <SettingsProvider>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-          <Stack.Screen name="admin" options={{ headerShown: false }} />
         </Stack>
       </ThemeProvider>
-    </AdminProvider>
+    </SettingsProvider>
   );
 }

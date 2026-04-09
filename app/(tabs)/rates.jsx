@@ -1,14 +1,17 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { StyleSheet, TouchableOpacity, Text, View, StatusBar, Image, Dimensions, ImageBackground, Animated, Easing } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LIVE_RATES_XML_URL, parseLiveRatesXml } from '../../constants/liveRates';
-import { useAdmin } from '../../context/AdminContext';
+import { useFocusEffect } from '@react-navigation/native';
+import * as Audio from 'expo-av/build/Audio';
+import { fetchRatesIdMap } from '../../constants/liveRates';
+import { useSettings } from '../../context/SettingsContext';
 import { API_ENDPOINTS } from '../../constants/Config';
 
 const { width } = Dimensions.get('window');
 const HEADER_IMAGE = require('../../assets/images/mobile-rates-header.webp');
 const BG_IMAGE = require('../../assets/images/bg-internal.jpg');
 const TICKER_IMAGE = require('../../assets/images/bg-ticker.webp');
+const RATES_MUSIC = require('../../assets/images/music/rates.mp3');
 const TICKER_TEXT = "✦   WELCOME TO ABHINAV GOLD & SILVER - QUALITY PURITY GUARANTEED   ";
 const imageSource = Image.resolveAssetSource(HEADER_IMAGE);
 const ASPECT_RATIO = imageSource.width / imageSource.height;
@@ -24,45 +27,22 @@ const RetailRow = ({ purity, rate, isLast = false }) => (
 export default function RatesScreen() {
   const insets = useSafeAreaInsets();
   const scrollX = useRef(new Animated.Value(0)).current;
-  const { adminSettings } = useAdmin();
+  const { settings } = useSettings();
   const [tickerWidth, setTickerWidth] = useState(0);
   const [rates, setRates] = useState({});
+  const [isMusicOn, setIsMusicOn] = useState(false);
 
   const isFetchingRatesRef = useRef(false);
   const prevRatesRef = useRef({});
+  const soundRef = useRef(null);
 
   useEffect(() => {
     const fetchRates = async () => {
       if (isFetchingRatesRef.current) return;
       isFetchingRatesRef.current = true;
       try {
-        const timestamp = Date.now();
-        const res = await fetch(`${API_ENDPOINTS.RATES}?_=${timestamp}`);
-        let newRates = {};
-        
-        if (res.ok) {
-          const contentType = res.headers.get("content-type");
-          if (contentType && contentType.includes("application/json")) {
-            const data = await res.json();
-            if (data['945'] || data['gold']) {
-              newRates = data;
-            } else {
-              newRates = parseLiveRatesXml(data.text || '');
-            }
-          } else {
-            const text = await res.text();
-            newRates = parseLiveRatesXml(text || '');
-          }
-        }
-        // Fallback to direct XML feed when API is unavailable/empty.
-        if (!newRates || Object.keys(newRates).length === 0) {
-          const xmlRes = await fetch(`${LIVE_RATES_XML_URL}?_=${timestamp}`);
-          if (xmlRes.ok) {
-            const xmlText = await xmlRes.text();
-            newRates = parseLiveRatesXml(xmlText || '');
-          }
-        }
-        // Keep last known rates if both sources fail.
+        let newRates = await fetchRatesIdMap(API_ENDPOINTS.RATES_LIVE);
+
         if (!newRates || Object.keys(newRates).length === 0) {
           newRates = prevRatesRef.current || {};
         }
@@ -92,15 +72,14 @@ export default function RatesScreen() {
       return base + v;
     };
 
-    const mods = adminSettings.ratesPageModifications;
+    const mods = settings.ratesPageModifications;
 
-    // Apply Rates Page specific offset if enabled
-    if (mods?.isModifiedMode) {
-      num = applyOffset(num, mods.gold999);
-    }
-    
-    const calculated = Math.round(num * factor);
-    return calculated.toLocaleString('en-IN');
+    // Match website behavior:
+    // 1) Compute karat base from LIVE 999
+    // 2) Apply flat Rates Page offset AFTER karat calculation (not multiplied by factor)
+    const karatBase = Math.round(num * factor);
+    const withOffset = mods?.isModifiedMode ? applyOffset(karatBase, mods.gold999) : karatBase;
+    return withOffset.toLocaleString('en-IN');
   };
 
   const getSilverRate = () => {
@@ -116,7 +95,7 @@ export default function RatesScreen() {
       return base + v;
     };
 
-    const mods = adminSettings.ratesPageModifications;
+    const mods = settings.ratesPageModifications;
 
     if (mods?.isModifiedMode) {
       perKg = applyOffset(perKg, mods.silver999);
@@ -141,7 +120,72 @@ export default function RatesScreen() {
   // Reset ticker width when text changes
   useEffect(() => {
     setTickerWidth(0);
-  }, [adminSettings.ticker]);
+  }, [settings.ticker]);
+
+  const stopAndResetMusic = React.useCallback(async () => {
+    const snd = soundRef.current;
+    soundRef.current = null;
+    if (snd) {
+      try {
+        await snd.stopAsync();
+      } catch {}
+      try {
+        await snd.unloadAsync();
+      } catch {}
+    }
+    setIsMusicOn(false);
+  }, []);
+
+  const startMusic = React.useCallback(async () => {
+    try {
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        shouldDuckAndroid: true,
+        staysActiveInBackground: false,
+      });
+      const { sound } = await Audio.Sound.createAsync(RATES_MUSIC, {
+        shouldPlay: true,
+        isLooping: true,
+        volume: 1.0,
+      });
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (!status.isLoaded && status.error) {
+          console.log('Rates music playback error:', status.error);
+        }
+      });
+      soundRef.current = sound;
+      setIsMusicOn(true);
+    } catch (e) {
+      console.log('Rates music start failed:', e);
+      await stopAndResetMusic();
+    }
+  }, [stopAndResetMusic]);
+
+  const toggleMusic = React.useCallback(async () => {
+    if (isMusicOn) {
+      await stopAndResetMusic();
+      return;
+    }
+    // Immediate UI feedback on tap.
+    setIsMusicOn(true);
+    await startMusic();
+  }, [isMusicOn, stopAndResetMusic, startMusic]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      return () => {
+        void stopAndResetMusic();
+      };
+    }, [stopAndResetMusic])
+  );
+
+  useEffect(() => {
+    return () => {
+      void stopAndResetMusic();
+    };
+  }, [stopAndResetMusic]);
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
@@ -165,10 +209,10 @@ export default function RatesScreen() {
                 }}
                 style={styles.tickerText}
               >
-                {adminSettings.ticker}
+                {settings.ticker}
               </Text>
               {Array.from({ length: 15 }).map((_, i) => (
-                  <Text key={i} style={styles.tickerText}>{adminSettings.ticker}</Text>
+                  <Text key={i} style={styles.tickerText}>{settings.ticker}</Text>
               ))}
             </Animated.View>
           </ImageBackground>
@@ -190,6 +234,12 @@ export default function RatesScreen() {
               <RetailRow purity="Gold 18 KT" rate={calculateKaratRate(rates['945']?.ask, 0.75)} />
               <RetailRow purity="Gold 14 KT" rate={calculateKaratRate(rates['945']?.ask, 0.583)} isLast />
             </View>
+          </View>
+
+          <View style={styles.musicButtonWrap}>
+            <TouchableOpacity style={styles.musicButton} onPress={toggleMusic} activeOpacity={0.8} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+              <Text style={styles.musicButtonText}>{isMusicOn ? 'MUSIC ON' : 'MUSIC OFF'}</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -280,5 +330,25 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#F0C733', 
     letterSpacing: 0.5,
+  },
+  musicButtonWrap: {
+    width: '100%',
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  musicButton: {
+    backgroundColor: '#e5e7eb',
+    borderRadius: 28,
+    borderWidth: 2,
+    borderColor: '#cbd5e1',
+    paddingHorizontal: 34,
+    paddingVertical: 14,
+  },
+  musicButtonText: {
+    color: '#334155',
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: 1,
   },
 });

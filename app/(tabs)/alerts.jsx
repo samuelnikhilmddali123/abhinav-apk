@@ -3,7 +3,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useRef, useEffect, useState } from 'react';
 import { MaterialCommunityIcons, FontAwesome5, Ionicons } from '@expo/vector-icons';
-import { useAdmin } from '../../context/AdminContext';
+import { useSettings } from '../../context/SettingsContext';
 import { API_ENDPOINTS } from '../../constants/Config';
 
 const { width } = Dimensions.get('window');
@@ -21,7 +21,7 @@ export default function AlertsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const scrollX = useRef(new Animated.Value(0)).current;
-  const { adminSettings } = useAdmin();
+  const { settings } = useSettings();
   const [tickerWidth, setTickerWidth] = useState(0);
   const [news, setNews] = useState([]);
 
@@ -90,7 +90,7 @@ export default function AlertsScreen() {
   // Reset ticker width when text changes
   useEffect(() => {
     setTickerWidth(0);
-  }, [adminSettings.ticker]);
+  }, [settings.ticker]);
 
   const openLink = (url) => {
     Linking.openURL(url);
@@ -126,10 +126,10 @@ export default function AlertsScreen() {
                   }}
                   numberOfLines={1}
                 >
-                  {adminSettings.ticker}
+                  {settings.ticker}
                 </Text>
                 {Array.from({ length: 15 }).map((_, i) => (
-                  <Text key={i} style={styles.tickerText} numberOfLines={1}>{adminSettings.ticker}</Text>
+                  <Text key={i} style={styles.tickerText} numberOfLines={1}>{settings.ticker}</Text>
                 ))}
               </Animated.View>
             </View>
@@ -188,7 +188,7 @@ export default function AlertsScreen() {
 
             <View style={styles.footerSection}>
               <View style={styles.brandingRow}>
-              <TouchableOpacity onPress={() => router.push('/admin')}>
+              <TouchableOpacity onPress={() => router.push('/(tabs)')}>
                 <Image source={LOGO_IMAGE} style={styles.footerLogo} resizeMode="contain" />
               </TouchableOpacity>
                 <View>
