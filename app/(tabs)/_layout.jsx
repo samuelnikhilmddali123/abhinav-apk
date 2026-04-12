@@ -1,13 +1,23 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { FontAwesome } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { stopAllScreenMusicOnTabChange } from '../../constants/tabScreenMusicStop';
 
 function TabBarIcon(props) {
   return <FontAwesome size={24} style={{ marginBottom: -3 }} {...props} />;
 }
 
 function CustomTabBar({ state, descriptors, navigation }) {
+  const prevIndexRef = useRef(state.index);
+
+  useEffect(() => {
+    if (prevIndexRef.current !== state.index) {
+      prevIndexRef.current = state.index;
+      stopAllScreenMusicOnTabChange();
+    }
+  }, [state.index]);
+
   return (
     <View style={styles.tabBarContainer}>
       <View style={styles.topBorder} />

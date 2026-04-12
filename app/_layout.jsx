@@ -2,7 +2,9 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { View, Animated, StyleSheet, Image } from 'react-native';
+import { Video, ResizeMode } from 'expo-av';
 import 'react-native-reanimated';
 
 import { useColorScheme } from '@/components/useColorScheme';
@@ -26,6 +28,11 @@ export default function RootLayout() {
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
 
+  const [isReady, setIsReady] = useState(false);
+  const [splashVisible, setSplashVisible] = useState(true);
+  const [videoError, setVideoError] = useState(false);
+  const fadeAnim = useRef(new Animated.Value(1)).current;
+
   // Expo Router uses Error Boundaries to catch errors in the navigation tree.
   useEffect(() => {
     if (error) throw error;
@@ -33,15 +40,57 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (loaded) {
-      SplashScreen.hideAsync();
+      SplashScreen.hideAsync().then(() => {
+        setIsReady(true);
+        // Fade out the static splash screen after 2 seconds
+        setTimeout(() => {
+          fadeOut();
+        }, 2000);
+      });
     }
   }, [loaded]);
+
+  const handleVideoStatusUpdate = (status) => {
+    if (status.didJustFinish) {
+      fadeOut();
+    }
+  };
+
+  const handleError = () => {
+    setVideoError(true);
+    setTimeout(() => {
+      fadeOut();
+    }, 2000); // Wait briefly before fading if fallback is shown
+  };
+
+  const fadeOut = () => {
+    Animated.timing(fadeAnim, {
+      toValue: 0,
+      duration: 500, // Smooth 500ms fade
+      useNativeDriver: true,
+    }).start(() => {
+      setSplashVisible(false);
+    });
+  };
 
   if (!loaded) {
     return null;
   }
 
-  return <RootLayoutNav />;
+  return (
+    <View style={{ flex: 1, backgroundColor: '#000' }}>
+      <RootLayoutNav />
+      {splashVisible && (
+        <Animated.View style={[StyleSheet.absoluteFill, { opacity: fadeAnim, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }]}>
+          <Image
+            source={require('../assets/images/Untitled design (2).png')}
+            style={{ width: 250, height: 250 }}
+            resizeMode="contain"
+          />
+        </Animated.View>
+      )}
+    </View>
+  );
 }
 
 function RootLayoutNav() {

@@ -2,11 +2,12 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, Dimensions, StatusBar, ImageBackground, ScrollView, Animated, Easing } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Audio from 'expo-av/build/Audio';
 import { fetchRatesIdMap } from '../../constants/liveRates';
 import { useSettings } from '../../context/SettingsContext';
 import { API_ENDPOINTS } from '../../constants/Config';
+import { registerTabScreenMusicStop } from '../../constants/tabScreenMusicStop';
 
 const { width } = Dimensions.get('window');
 const HEADER_IMAGE = require('../../assets/images/mobile-home-header.webp');
@@ -385,6 +386,10 @@ export default function HomeScreen() {
     };
   }, [stopAndResetMusic]);
 
+  useEffect(() => {
+    return registerTabScreenMusicStop(() => stopAndResetMusic());
+  }, [stopAndResetMusic]);
+
   const formatPrice = (val, multiplier = 1, type = 'none') => {
     // Treat only explicit "missing" values as empty. "0" is valid.
     if (val === undefined || val === null || val === '-' || val === '') return '--';
@@ -540,9 +545,9 @@ export default function HomeScreen() {
 
             <View style={styles.retailHeaderRow}>
               <View style={styles.retailHeaderPill}><Text style={styles.retailHeaderText}>PRODUCTS</Text></View>
-              <View style={styles.retailHeaderPill}><Text style={styles.retailHeaderText}>BUY</Text></View>
-              <View style={styles.retailHeaderPill}><Text style={styles.retailHeaderText}>SELL</Text></View>
-              <View style={styles.retailHeaderPill}><Text style={styles.retailHeaderText}>HI / LO</Text></View>
+              <View style={[styles.retailHeaderPill, { transform: [{ translateX: -22 }] }]}><Text style={styles.retailHeaderText}>BUY</Text></View>
+              <View style={[styles.retailHeaderPill, { transform: [{ translateX: -22 }] }]}><Text style={styles.retailHeaderText}>SELL</Text></View>
+              <View style={[styles.retailHeaderPill, { transform: [{ translateX: -22 }] }]}><Text style={styles.retailHeaderText}>HI / LO</Text></View>
             </View>
             
             <View style={styles.retailTableCard}>
@@ -582,8 +587,21 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.musicButtonWrap}>
-            <TouchableOpacity style={styles.musicButton} onPress={toggleMusic} activeOpacity={0.8} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Text style={styles.musicButtonText}>{isMusicOn ? 'MUSIC ON' : 'MUSIC OFF'}</Text>
+            <TouchableOpacity
+              style={[styles.musicButton, isMusicOn ? styles.musicButtonOn : styles.musicButtonOff]}
+              onPress={toggleMusic}
+              activeOpacity={0.85}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <MaterialCommunityIcons
+                name="music-note"
+                size={22}
+                color={isMusicOn ? '#FFFFFF' : '#1e293b'}
+                style={styles.musicButtonIcon}
+              />
+              <Text style={[styles.musicButtonText, isMusicOn ? styles.musicButtonTextOn : styles.musicButtonTextOff]}>
+                {isMusicOn ? 'MUSIC ON' : 'MUSIC OFF'}
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -892,18 +910,36 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   musicButton: {
-    backgroundColor: '#e5e7eb',
-    borderRadius: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 999,
     borderWidth: 2,
-    borderColor: '#cbd5e1',
-    paddingHorizontal: 34,
+    paddingHorizontal: 28,
     paddingVertical: 14,
+    minWidth: width * 0.62,
+  },
+  musicButtonOn: {
+    backgroundColor: '#db2777',
+    borderColor: '#be185d',
+  },
+  musicButtonOff: {
+    backgroundColor: '#FFFFFF',
+    borderColor: 'rgba(30, 41, 59, 0.12)',
+  },
+  musicButtonIcon: {
+    marginRight: 10,
   },
   musicButtonText: {
-    color: '#334155',
     fontSize: 18,
     fontWeight: '900',
     letterSpacing: 1,
+  },
+  musicButtonTextOn: {
+    color: '#FFFFFF',
+  },
+  musicButtonTextOff: {
+    color: '#1e293b',
   },
   spotRateWrapper: {
     flex: 1,

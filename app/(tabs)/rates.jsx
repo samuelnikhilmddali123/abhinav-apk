@@ -2,10 +2,12 @@ import React, { useRef, useState, useEffect } from 'react';
 import { StyleSheet, TouchableOpacity, Text, View, StatusBar, Image, Dimensions, ImageBackground, Animated, Easing } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Audio from 'expo-av/build/Audio';
 import { fetchRatesIdMap } from '../../constants/liveRates';
 import { useSettings } from '../../context/SettingsContext';
 import { API_ENDPOINTS } from '../../constants/Config';
+import { registerTabScreenMusicStop } from '../../constants/tabScreenMusicStop';
 
 const { width } = Dimensions.get('window');
 const HEADER_IMAGE = require('../../assets/images/mobile-rates-header.webp');
@@ -16,11 +18,11 @@ const TICKER_TEXT = "✦   WELCOME TO ABHINAV GOLD & SILVER - QUALITY PURITY GUA
 const imageSource = Image.resolveAssetSource(HEADER_IMAGE);
 const ASPECT_RATIO = imageSource.width / imageSource.height;
 
-const RetailRow = ({ purity, rate, isLast = false }) => (
+const RetailRow = ({ purity, rate8g, rate10g, isLast = false }) => (
   <View style={[styles.retailRow, isLast && { borderBottomWidth: 0 }]}>
-    <Text style={[styles.retailColText, { flex: 1, textAlign: 'left', paddingLeft: 10 }]}>{purity}</Text>
-    <View style={{ flex: 1 }} />
-    <Text style={[styles.retailColRate, { flex: 1, textAlign: 'right', paddingRight: 10 }]}>{rate}</Text>
+    <Text style={[styles.retailColText, { flex: 1.2, textAlign: 'left', paddingLeft: 10 }]}>{purity}</Text>
+    <Text style={[styles.retailColRate, { flex: 1, textAlign: 'center' }]}>{rate8g}</Text>
+    <Text style={[styles.retailColRate, { flex: 1, textAlign: 'right', paddingRight: 10 }]}>{rate10g}</Text>
   </View>
 );
 
@@ -60,26 +62,26 @@ export default function RatesScreen() {
     return () => clearInterval(interval);
   }, []);
 
-  const calculateKaratRate = (baseAsk, factor) => {
+  // Same math as abhanav-website `src/context/RateContext.jsx` → `ratesPagePurities`:
+  // karatBase = Math.round(live999Sell * factor)
+  // sell (10g) = karatBase or Math.round(karatBase + ratesPage.gold) when showModified
+  // sell8g = Math.round(sell * 0.8) — offset applies only via 10g sell, not added again on 8g
+  const calculateKaratRate = (baseAsk, karatFactor, grams = 10) => {
     if (!baseAsk || baseAsk === '-') return '--';
-    let num = parseFloat(baseAsk);
-    if (isNaN(num)) return '--';
-    
-    const applyOffset = (base, offsetVal) => {
-      if (offsetVal === undefined || offsetVal === null) return base;
-      const v = Number(offsetVal);
-      if (isNaN(v)) return base;
-      return base + v;
-    };
+    const live999Sell = parseFloat(baseAsk);
+    if (isNaN(live999Sell) || live999Sell === 0) return '--';
 
     const mods = settings.ratesPageModifications;
+    const karatBase = Math.round(live999Sell * karatFactor);
 
-    // Match website behavior:
-    // 1) Compute karat base from LIVE 999
-    // 2) Apply flat Rates Page offset AFTER karat calculation (not multiplied by factor)
-    const karatBase = Math.round(num * factor);
-    const withOffset = mods?.isModifiedMode ? applyOffset(karatBase, mods.gold999) : karatBase;
-    return withOffset.toLocaleString('en-IN');
+    let sell10 = karatBase;
+    if (mods?.isModifiedMode) {
+      const sDelta = Number(mods.gold999) || 0;
+      sell10 = Math.round(karatBase + sDelta);
+    }
+
+    const value = grams === 8 ? Math.round(sell10 * 0.8) : grams === 10 ? sell10 : Math.round((live999Sell / 10) * karatFactor * grams);
+    return '\u20B9' + value.toLocaleString('en-IN');
   };
 
   const getSilverRate = () => {
@@ -186,6 +188,10 @@ export default function RatesScreen() {
     };
   }, [stopAndResetMusic]);
 
+  useEffect(() => {
+    return registerTabScreenMusicStop(() => stopAndResetMusic());
+  }, [stopAndResetMusic]);
+
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
@@ -223,22 +229,52 @@ export default function RatesScreen() {
 
           <View style={styles.tableContainer}>
             <View style={styles.tableHeaderRow}>
-              <Text style={[styles.headerText, { flex: 1, textAlign: 'left', paddingLeft: 10 }]}>PURITY</Text>
-              <Text style={[styles.headerText, { flex: 1, textAlign: 'center' }]}>GOLD RATES</Text>
-              <Text style={[styles.headerText, { flex: 1, textAlign: 'right', paddingRight: 10 }]}>RATES</Text>
+              <Text style={[styles.headerText, { flex: 1.2, textAlign: 'left', paddingLeft: 10 }]}>PURITY</Text>
+              <Text style={[styles.headerText, { flex: 1, textAlign: 'center' }]}>8 GRAMS</Text>
+              <Text style={[styles.headerText, { flex: 1, textAlign: 'right', paddingRight: 10 }]}>10 GRAMS</Text>
             </View>
 
             <View style={styles.tableBody}>
-              <RetailRow purity="Gold 24 KT" rate={calculateKaratRate(rates['945']?.ask, 1.0)} />
-              <RetailRow purity="Gold 22 KT" rate={calculateKaratRate(rates['945']?.ask, 0.916)} />
-              <RetailRow purity="Gold 18 KT" rate={calculateKaratRate(rates['945']?.ask, 0.75)} />
-              <RetailRow purity="Gold 14 KT" rate={calculateKaratRate(rates['945']?.ask, 0.583)} isLast />
+              <RetailRow
+                purity="Gold 24 KT"
+                rate8g={calculateKaratRate(rates['945']?.ask, 1.0, 8)}
+                rate10g={calculateKaratRate(rates['945']?.ask, 1.0, 10)}
+              />
+              <RetailRow
+                purity="Gold 22 KT"
+                rate8g={calculateKaratRate(rates['945']?.ask, 0.916, 8)}
+                rate10g={calculateKaratRate(rates['945']?.ask, 0.916, 10)}
+              />
+              <RetailRow
+                purity="Gold 18 KT"
+                rate8g={calculateKaratRate(rates['945']?.ask, 0.75, 8)}
+                rate10g={calculateKaratRate(rates['945']?.ask, 0.75, 10)}
+              />
+              <RetailRow
+                purity="Gold 14 KT"
+                rate8g={calculateKaratRate(rates['945']?.ask, 0.583, 8)}
+                rate10g={calculateKaratRate(rates['945']?.ask, 0.583, 10)}
+                isLast
+              />
             </View>
           </View>
 
           <View style={styles.musicButtonWrap}>
-            <TouchableOpacity style={styles.musicButton} onPress={toggleMusic} activeOpacity={0.8} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-              <Text style={styles.musicButtonText}>{isMusicOn ? 'MUSIC ON' : 'MUSIC OFF'}</Text>
+            <TouchableOpacity
+              style={[styles.musicButton, isMusicOn ? styles.musicButtonOn : styles.musicButtonOff]}
+              onPress={toggleMusic}
+              activeOpacity={0.85}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <MaterialCommunityIcons
+                name="music-note"
+                size={22}
+                color={isMusicOn ? '#FFFFFF' : '#1e293b'}
+                style={styles.musicButtonIcon}
+              />
+              <Text style={[styles.musicButtonText, isMusicOn ? styles.musicButtonTextOn : styles.musicButtonTextOff]}>
+                {isMusicOn ? 'MUSIC ON' : 'MUSIC OFF'}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -326,7 +362,7 @@ const styles = StyleSheet.create({
     color: '#FFF',
   },
   retailColRate: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '900',
     color: '#F0C733', 
     letterSpacing: 0.5,
@@ -338,17 +374,35 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   musicButton: {
-    backgroundColor: '#e5e7eb',
-    borderRadius: 28,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 999,
     borderWidth: 2,
-    borderColor: '#cbd5e1',
-    paddingHorizontal: 34,
+    paddingHorizontal: 28,
     paddingVertical: 14,
+    minWidth: width * 0.62,
+  },
+  musicButtonOn: {
+    backgroundColor: '#db2777',
+    borderColor: '#be185d',
+  },
+  musicButtonOff: {
+    backgroundColor: '#FFFFFF',
+    borderColor: 'rgba(30, 41, 59, 0.12)',
+  },
+  musicButtonIcon: {
+    marginRight: 10,
   },
   musicButtonText: {
-    color: '#334155',
     fontSize: 18,
     fontWeight: '900',
     letterSpacing: 1,
+  },
+  musicButtonTextOn: {
+    color: '#FFFFFF',
+  },
+  musicButtonTextOff: {
+    color: '#1e293b',
   },
 });
