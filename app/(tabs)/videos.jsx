@@ -1,11 +1,11 @@
 import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
-import { StyleSheet, View, StatusBar, Image, ImageBackground, Text, Easing, Dimensions, TouchableOpacity, Linking, Animated as RNAnimated, Platform, Modal } from 'react-native';
+import { StyleSheet, View, StatusBar, Image, ImageBackground, Text, Easing, Dimensions, TouchableOpacity, Linking, Animated as RNAnimated, Platform, Modal, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { FontAwesome } from '@expo/vector-icons';
 import YoutubePlayer from 'react-native-youtube-iframe';
 import { WebView } from 'react-native-webview';
 import { useSettings } from '../../context/SettingsContext';
-import NetInfo from '@react-native-community/netinfo';
+import { useNetInfo } from '@react-native-community/netinfo';
 import Animated, { useSharedValue, useAnimatedScrollHandler, useAnimatedStyle, interpolate } from 'react-native-reanimated';
 
 const { width, height: SCREEN_H } = Dimensions.get('window');
@@ -145,16 +145,16 @@ function CarouselItem({ item, index, scrollX, onPlayVideo, isPlaying }) {
             <Animated.View style={[styles.dimOverlay, dimOverlayStyle]} />
             <Animated.View style={[styles.playBtnWrap, playStyle]} pointerEvents="box-none">
               <View style={styles.playBtnCircle}>
-                <MaterialCommunityIcons name="play" size={36} color="#FFF" style={{ marginLeft: 4 }} />
+                <FontAwesome name="play" size={36} color="#FFF" style={{ marginLeft: 6 }} />
               </View>
             </Animated.View>
             <Animated.View style={[styles.topChrome, activeChromeStyle]} pointerEvents="box-none">
               <View style={styles.chromeRow}>
                 <TouchableOpacity style={styles.chromeBtn} onPress={openVideo} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <MaterialCommunityIcons name="volume-high" size={22} color="#FFF" />
+                  <FontAwesome name="volume-up" size={22} color="#FFF" />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.chromeBtn} onPress={openVideo} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <MaterialCommunityIcons name="fullscreen" size={22} color="#FFF" />
+                  <FontAwesome name="arrows-alt" size={22} color="#FFF" />
                 </TouchableOpacity>
               </View>
             </Animated.View>
@@ -186,15 +186,9 @@ export default function VideosScreen() {
   const [tickerWidth, setTickerWidth] = useState(0);
   const [videoIndex, setVideoIndex] = useState(0);
   const [playerVideo, setPlayerVideo] = useState(null);
-  const [isConnected, setIsConnected] = useState(true);
-
-  useEffect(() => {
-    const unsubscribe = NetInfo.addEventListener(state => {
-      setIsConnected(state.isConnected);
-    });
-    NetInfo.fetch().then(state => setIsConnected(state.isConnected));
-    return () => unsubscribe();
-  }, []);
+  const [refreshing, setRefreshing] = useState(false);
+  const netInfo = useNetInfo();
+  const isConnected = netInfo.isConnected !== false;
 
   const openPlayer = useCallback((item) => {
     if (!item?.videoId) return;
@@ -262,12 +256,12 @@ export default function VideosScreen() {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
         <StatusBar barStyle="light-content" />
-        <MaterialCommunityIcons name="wifi-off" size={64} color={GOLD} style={{ marginBottom: 20 }} />
+        <FontAwesome name="wifi" size={64} color={GOLD} style={{ marginBottom: 20 }} />
         <Text style={{ color: '#FFF', fontSize: 24, fontWeight: '900', marginBottom: 10 }}>No Internet</Text>
         <Text style={{ color: 'rgba(255,255,255,0.6)', textAlign: 'center', marginBottom: 30 }}>Please connect to the internet to view latest videos.</Text>
         <TouchableOpacity 
           style={{ backgroundColor: GOLD, paddingHorizontal: 40, paddingVertical: 14, borderRadius: 30 }}
-          onPress={() => NetInfo.fetch().then(s => setIsConnected(s.isConnected))}
+          onPress={() => {}}
         >
           <Text style={{ color: '#000', fontWeight: '900' }}>RETRY</Text>
         </TouchableOpacity>
@@ -284,6 +278,17 @@ export default function VideosScreen() {
           style={{ flex: 1 }}
           contentContainerStyle={{ paddingBottom: 100 }}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                setTimeout(() => setRefreshing(false), 2000);
+              }}
+              colors={['#FBBF24']}
+              tintColor={'#FBBF24'}
+            />
+          }
         >
           <View style={[styles.headerContainer, { paddingTop: insets.top + 10 }]}>
             <Image source={LOGO_IMAGE} style={styles.logo} resizeMode="contain" />
@@ -343,7 +348,7 @@ export default function VideosScreen() {
                        <Text style={styles.moreVideoTitle} numberOfLines={2}>{vid.title || 'Gold Price Update'}</Text>
                        <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, marginTop: 4 }}>Abhinav Gold & Silver</Text>
                      </View>
-                     <MaterialCommunityIcons name="play-circle-outline" size={28} color={GOLD} />
+                     <FontAwesome name="play-circle-o" size={28} color={GOLD} />
                    </TouchableOpacity>
                  ))}
                </View>

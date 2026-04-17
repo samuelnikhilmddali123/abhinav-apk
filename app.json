@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Abhinav Gold and Silver",
-    "slug": "abhinav-gold-and-silver",
+    "slug": "jewllery-expo",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/Untitled design (2).png",
@@ -12,7 +12,11 @@
     },
     "android": {
       "predictiveBackGestureEnabled": false,
-      "package": "com.nikhil_2003.jewelryexpo"
+      "package": "com.nikhil_2003.jewelryexpo",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/Untitled design (2).png",
+        "backgroundColor": "#000000"
+      }
     },
     "web": {
       "bundler": "metro",

@@ -1,10 +1,10 @@
-import { StyleSheet, View, ImageBackground, StatusBar, Image, Animated, Text, Easing, Dimensions, ScrollView, TouchableOpacity, Linking, Platform, Modal } from 'react-native';
+import { StyleSheet, View, ImageBackground, StatusBar, Image, Animated, Text, Easing, Dimensions, ScrollView, TouchableOpacity, Linking, Platform, Modal, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useRef, useEffect, useState } from 'react';
-import { MaterialCommunityIcons, FontAwesome5, Ionicons } from '@expo/vector-icons';
+import { FontAwesome, FontAwesome5, Ionicons } from '@expo/vector-icons';
 import { useSettings } from '../../context/SettingsContext';
-import NetInfo from '@react-native-community/netinfo';
+import { useNetInfo } from '@react-native-community/netinfo';
 import { API_ENDPOINTS } from '../../constants/Config';
 
 const { width } = Dimensions.get('window');
@@ -24,17 +24,11 @@ export default function AlertsScreen() {
   const { settings } = useSettings();
   const [tickerWidth, setTickerWidth] = useState(0);
   const [news, setNews] = useState([]);
-  const [isConnected, setIsConnected] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [qrModalVisible, setQrModalVisible] = useState(false);
   const [selectedQr, setSelectedQr] = useState(null);
-
-  useEffect(() => {
-    const unsubscribe = NetInfo.addEventListener(state => {
-      setIsConnected(state.isConnected);
-    });
-    NetInfo.fetch().then(state => setIsConnected(state.isConnected));
-    return () => unsubscribe();
-  }, []);
+  const netInfo = useNetInfo();
+  const isConnected = netInfo.isConnected !== false;
 
   const parseNews = (xml) => {
     if (!xml) return [];
@@ -135,12 +129,12 @@ export default function AlertsScreen() {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 20, backgroundColor: '#001A33' }]}>
         <StatusBar barStyle="light-content" />
-        <MaterialCommunityIcons name="wifi-off" size={64} color="#F9D342" style={{ marginBottom: 20 }} />
+        <FontAwesome name="wifi" size={64} color="#F9D342" style={{ marginBottom: 20 }} />
         <Text style={{ color: '#FFF', fontSize: 24, fontWeight: '900', marginBottom: 10 }}>Disconnected</Text>
         <Text style={{ color: 'rgba(255,255,255,0.6)', textAlign: 'center', marginBottom: 30 }}>Enable data or Wi-Fi to receive the latest market alerts.</Text>
         <TouchableOpacity 
           style={{ backgroundColor: '#F9D342', paddingHorizontal: 40, paddingVertical: 14, borderRadius: 30 }}
-          onPress={() => NetInfo.fetch().then(s => setIsConnected(s.isConnected))}
+          onPress={() => {}}
         >
           <Text style={{ color: '#000', fontWeight: '900' }}>RETRY</Text>
         </TouchableOpacity>
@@ -187,11 +181,37 @@ export default function AlertsScreen() {
           </ImageBackground>
         </View>
 
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent} 
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={async () => {
+                setRefreshing(true);
+                try {
+                  const res = await fetch('https://www.investing.com/rss/news.rss');
+                  if (res.ok) {
+                    const xml = await res.text();
+                    const parsed = parseNews(xml);
+                    if (parsed && parsed.length > 0) {
+                      setNews(parsed);
+                    }
+                  }
+                } catch (err) {
+                } finally {
+                  setRefreshing(false);
+                }
+              }}
+              colors={['#F9D342']}
+              tintColor={'#F9D342'}
+            />
+          }
+        >
           
           <View style={styles.newsSection}>
             <View style={styles.sectionHeader}>
-              <MaterialCommunityIcons name="bell" size={24} color="#F9D342" style={{ marginRight: 10 }} />
+              <FontAwesome name="bell" size={24} color="#F9D342" style={{ marginRight: 10 }} />
               <Text style={styles.sectionTitle}>MARKET ALERTS</Text>
             </View>
 
@@ -202,7 +222,7 @@ export default function AlertsScreen() {
                     <View>
                       <Text style={styles.newsTitle}>{item.title}</Text>
                       <View style={styles.newsDateRow}>
-                        <MaterialCommunityIcons name="calendar" size={12} color="rgba(255,255,255,0.6)" style={{ marginRight: 5 }} />
+                        <FontAwesome name="calendar" size={12} color="rgba(255,255,255,0.6)" style={{ marginRight: 5 }} />
                         <Text style={styles.newsDateText}>{item.date}</Text>
                       </View>
                     </View>
@@ -213,7 +233,7 @@ export default function AlertsScreen() {
               ))
             ) : (
               <View style={styles.noNewsCard}>
-                <MaterialCommunityIcons name="information" size={30} color="#F9D342" style={{ marginBottom: 10 }} />
+                <FontAwesome name="info-circle" size={30} color="#F9D342" style={{ marginBottom: 10 }} />
                 <Text style={styles.noNewsText}>Fetching latest market updates...</Text>
               </View>
             )}
@@ -249,13 +269,13 @@ export default function AlertsScreen() {
               
               <View style={styles.socialRow}>
                 <TouchableOpacity style={styles.socialIcon} onPress={() => openLink('https://www.instagram.com/abhinavjewellery/')}>
-                  <MaterialCommunityIcons name="instagram" size={20} color="#FFF" />
+                  <FontAwesome name="instagram" size={20} color="#FFF" />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.socialIcon} onPress={() => openLink('https://www.facebook.com/')}>
-                  <MaterialCommunityIcons name="facebook" size={20} color="#FFF" />
+                  <FontAwesome name="facebook" size={20} color="#FFF" />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.socialIcon} onPress={() => openLink('https://www.youtube.com/@abhinavjewellery')}>
-                  <MaterialCommunityIcons name="youtube" size={20} color="#FFF" />
+                  <FontAwesome name="youtube-play" size={20} color="#FFF" />
                 </TouchableOpacity>
               </View>
             </View>
@@ -263,11 +283,11 @@ export default function AlertsScreen() {
             <View style={styles.footerSection}>
               <Text style={styles.footerLabel}>WHY CHOOSE US</Text>
               <View style={styles.featureItem}>
-                <MaterialCommunityIcons name="shield-check" size={16} color="#F9D342" style={{ marginRight: 10 }} />
+                <FontAwesome name="shield" size={16} color="#F9D342" style={{ marginRight: 10 }} />
                 <Text style={styles.featureText}>100% Purity Guaranteed</Text>
               </View>
               <View style={styles.featureItem}>
-                <MaterialCommunityIcons name="clock-outline" size={16} color="#F9D342" style={{ marginRight: 10 }} />
+                <FontAwesome name="clock-o" size={16} color="#F9D342" style={{ marginRight: 10 }} />
                 <Text style={styles.featureText}>Real-time Market Rates</Text>
               </View>
               <View style={styles.featureItem}>
@@ -279,21 +299,21 @@ export default function AlertsScreen() {
             <View style={styles.footerSection}>
               <Text style={styles.footerLabel}>CONTACT US</Text>
               <TouchableOpacity style={styles.contactItem} onPress={() => openLink('tel:+919441055916')}>
-                <View style={styles.contactIconContainer}><MaterialCommunityIcons name="phone" size={18} color="#F9D342" /></View>
+                <View style={styles.contactIconContainer}><FontAwesome name="phone" size={18} color="#F9D342" /></View>
                 <View>
                   <Text style={styles.contactSmallLabel}>WHATSAPP / CALL</Text>
                   <Text style={styles.contactValue}>+91 94410 55916</Text>
                 </View>
               </TouchableOpacity>
               <TouchableOpacity style={styles.contactItem} onPress={() => openLink('mailto:info@abhinavjewellers.com')}>
-                <View style={styles.contactIconContainer}><MaterialCommunityIcons name="email" size={18} color="#F9D342" /></View>
+                <View style={styles.contactIconContainer}><FontAwesome name="envelope" size={18} color="#F9D342" /></View>
                 <View>
                   <Text style={styles.contactSmallLabel}>EMAIL SUPPORT</Text>
                   <Text style={styles.contactValue}>info@abhinavjewellers.com</Text>
                 </View>
               </TouchableOpacity>
               <View style={styles.contactItem}>
-                <View style={styles.contactIconContainer}><MaterialCommunityIcons name="map-marker" size={18} color="#F9D342" /></View>
+                <View style={styles.contactIconContainer}><FontAwesome name="map-marker" size={18} color="#F9D342" /></View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.contactSmallLabel}>MAIN BRANCH</Text>
                   <Text style={styles.contactValue}>D/o.16-8-15/a, Akkalabasavhai Street, Tenali, 522201</Text>
@@ -333,7 +353,7 @@ export default function AlertsScreen() {
               style={styles.closeBtn} 
               onPress={() => setQrModalVisible(false)}
             >
-              <MaterialCommunityIcons name="close" size={28} color="#FFF" />
+              <FontAwesome name="times" size={28} color="#FFF" />
             </TouchableOpacity>
             
             {selectedQr && (

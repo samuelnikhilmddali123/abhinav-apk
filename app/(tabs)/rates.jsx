@@ -1,10 +1,10 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { StyleSheet, TouchableOpacity, Text, View, StatusBar, Image, Dimensions, ImageBackground, Animated, Easing, ScrollView } from 'react-native';
+import { StyleSheet, TouchableOpacity, Text, View, StatusBar, Image, Dimensions, ImageBackground, Animated, Easing, ScrollView, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import NetInfo from '@react-native-community/netinfo';
-import * as Audio from 'expo-av/build/Audio';
+import { FontAwesome } from '@expo/vector-icons';
+import { useNetInfo } from '@react-native-community/netinfo';
+import { Audio } from 'expo-av';
 import { fetchRatesIdMap } from '../../constants/liveRates';
 import { useSettings } from '../../context/SettingsContext';
 import { API_ENDPOINTS, FILE_ROOT } from '../../constants/Config';
@@ -57,21 +57,15 @@ const RetailRow = ({ purity, rate10g, trend, isLast = false }) => (
 export default function RatesScreen() {
   const scrollX = useRef(new Animated.Value(0)).current;
   const { settings } = useSettings();
-  const [tickerWidth, setTickerWidth] = useState(0);
+   const [refreshing, setRefreshing] = useState(false);
+   const [tickerWidth, setTickerWidth] = useState(0);
   const [rawRates, setRawRates] = useState({});
   const [previousRates, setPreviousRates] = useState({});
   const [currentRates, setCurrentRates] = useState({});
   const [trends, setTrends] = useState({});
   const [isMusicOn, setIsMusicOn] = useState(false);
-  const [isConnected, setIsConnected] = useState(true);
-
-  useEffect(() => {
-    const unsubscribe = NetInfo.addEventListener(state => {
-      setIsConnected(state.isConnected);
-    });
-    NetInfo.fetch().then(state => setIsConnected(state.isConnected));
-    return () => unsubscribe();
-  }, []);
+  const netInfo = useNetInfo();
+  const isConnected = netInfo.isConnected !== false;
 
   useEffect(() => {
     if (Object.keys(rawRates).length > 0) {
@@ -298,10 +292,10 @@ export default function RatesScreen() {
     return (
       <View style={[styles.container, styles.offlineContainer]}>
         <StatusBar barStyle="light-content" backgroundColor="#1A0B2E" />
-        <MaterialCommunityIcons name="wifi-off" size={64} color="#F0C733" style={{ marginBottom: 20 }} />
+        <FontAwesome name="wifi" size={64} color="#F0C733" style={{ marginBottom: 20 }} />
         <Text style={styles.offlineTitle}>No Internet Connection</Text>
         <Text style={styles.offlineSubTitle}>Please check your network settings to view live rates.</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={() => NetInfo.fetch().then(s => setIsConnected(s.isConnected))}>
+        <TouchableOpacity style={styles.retryButton} onPress={() => {}}>
           <Text style={styles.retryText}>Retry</Text>
         </TouchableOpacity>
       </View>
@@ -318,6 +312,25 @@ export default function RatesScreen() {
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           bounces
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={async () => {
+                 setRefreshing(true);
+                 try {
+                   const newMap = await fetchRatesIdMap(API_ENDPOINTS.RATES_LIVE);
+                   if (newMap && Object.keys(newMap).length > 0) {
+                       setRawRates(newMap);
+                   }
+                 } catch (e) {
+                 } finally {
+                   setRefreshing(false);
+                 }
+              }}
+              colors={['#F0C733']}
+              tintColor={'#F0C733'}
+            />
+          }
         >
           <Image
             source={HEADER_IMAGE}
@@ -453,8 +466,8 @@ export default function RatesScreen() {
                 activeOpacity={0.85}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <MaterialCommunityIcons
-                  name="music-note"
+                <FontAwesome
+                  name="music"
                   size={22}
                   color={isMusicOn ? '#FFFFFF' : '#1e293b'}
                   style={styles.musicButtonIcon}
