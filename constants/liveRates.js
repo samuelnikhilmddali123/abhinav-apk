@@ -3,8 +3,7 @@
  * same bcast URL, same whitespace row parser, same `/api/rates/live` fallback.
  */
 
-export const LIVE_RATES_XML_URL =
-  'https://bcast.rbgoldspot.com:7768/VOTSBroadcastStreaming/Services/xml/GetLiveRateByTemplateID/rbgold';
+export const LIVE_RATES_XML_URL = '';
 
 /** Same IDs/order as website INITIAL_SPOT_CONFIG / INITIAL_RTGS_CONFIG */
 const INITIAL_SPOT_CONFIG = [
@@ -183,29 +182,30 @@ export function parseLiveRateTextToIdMap(text) {
  * Fetch raw text the same way as the website: direct bcast, then `/api/rates/live`.
  */
 export async function fetchLiveRatesRawText(ratesLiveUrl) {
-  const ts = Date.now();
   try {
-    const r = await fetch(`${LIVE_RATES_XML_URL}?_=${ts}`, { cache: 'no-store' });
-    if (r.ok) {
-      const t = await r.text();
-      if (t && t.length > 50) return t;
+    // Try original direct fetch first
+    if (LIVE_RATES_XML_URL) {
+      const res = await fetch(LIVE_RATES_XML_URL);
+      if (res.ok) return await res.text();
     }
   } catch (e) {
-    /* ignore */
+    console.log('Direct bcast fetch failed, trying proxy...', e);
   }
 
   if (ratesLiveUrl) {
     try {
-      const r = await fetch(`${ratesLiveUrl}?_=${ts}`, { cache: 'no-store' });
-      if (r.ok) {
-        const j = await r.json();
-        if (j.text && String(j.text).length > 50) return j.text;
+      // Fallback to backend proxy (/api/rates/live)
+      const res = await fetch(ratesLiveUrl);
+      if (res.ok) {
+        const data = await res.json();
+        const rawText = data?.text || data?.rates || data?.raw || (typeof data === 'string' ? data : null);
+        // If we got an object (like an empty rates: {}), don't return it as raw text
+        return typeof rawText === 'string' ? rawText : null;
       }
     } catch (e) {
-      /* ignore */
+      console.log('Proxy fetch failed:', e);
     }
   }
-
   return null;
 }
 

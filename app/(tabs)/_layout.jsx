@@ -48,31 +48,24 @@ function CustomTabBar({ state, descriptors, navigation }) {
           const activeColor = '#F9D342'; // Gold
           const inactiveColor = '#8E8E93';
 
+          const iconName = route.name === 'index' ? 'home' :
+                           route.name === 'rates' ? 'bar-chart' :
+                           route.name === 'alerts' ? 'bell' : 
+                           'play-circle';
+
           return (
             <TouchableOpacity
               key={index}
               onPress={onPress}
-              style={[
-                styles.tabItem,
-                isFocused && styles.tabItemActive
-              ]}
+              style={isFocused ? styles.activeTabButton : styles.inactiveTabButton}
             >
-              <View style={styles.iconContainer}>
-                <TabBarIcon
-                  name={
-                    route.name === 'index' ? 'home' :
-                    route.name === 'rates' ? 'bar-chart' :
-                    route.name === 'alerts' ? 'bell' : 
-                    'play-circle'
-                  }
-                  color={isFocused ? activeColor : inactiveColor}
-                />
-                {isFocused && <View style={styles.activeDot} />}
-              </View>
-              <Text style={[
-                styles.tabLabel,
-                { color: isFocused ? activeColor : inactiveColor }
-              ]}>
+              <FontAwesome
+                name={iconName}
+                size={20}
+                color={isFocused ? "#FFD700" : "#9CA3AF"}
+                style={{ backgroundColor: 'transparent' }}
+              />
+              <Text style={[styles.tabLabel, { color: isFocused ? "#FFD700" : "#9CA3AF" }]}>
                 {label.toUpperCase()}
               </Text>
             </TouchableOpacity>
@@ -115,56 +108,52 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   tabBarContainer: {
-    backgroundColor: '#0F051D', // Darker background for tab bar
-    paddingBottom: Platform.OS === 'ios' ? 25 : 10,
+    backgroundColor: '#0F051D',
+    paddingBottom: Platform.OS === 'ios' ? 25 : 12,
   },
   topBorder: {
     height: 1,
-    backgroundColor: '#F9D342', // Gold top border
+    backgroundColor: '#D4AF37',
     opacity: 0.8,
   },
   tabBar: {
     flexDirection: 'row',
-    height: 80,
+    height: 85,
     justifyContent: 'space-around',
     alignItems: 'center',
-    paddingHorizontal: 15,
+    paddingHorizontal: 10,
+    backgroundColor: '#1A002B',
   },
-  tabItem: {
-    flex: 1,
+  activeTabButton: {
+    backgroundColor: '#30084a',
+    borderRadius: 18,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderWidth: 1.5,
+    borderColor: '#D4AF37',
+    shadowColor: '#D4AF37',
+    shadowOpacity: 0.6,
+    shadowRadius: 10,
+    elevation: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    height: 60,
-    borderRadius: 15,
+    flexDirection: 'column',
+    minWidth: 80,
   },
-  tabItemActive: {
-    backgroundColor: 'rgba(61, 11, 46, 0.4)', // Dark maroon/purple tint from image
-    borderWidth: 1,
-    borderColor: 'rgba(249, 211, 66, 0.5)', // Gold border
-    marginHorizontal: 4,
-    shadowColor: '#F9D342',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
-    elevation: 3,
-  },
-  iconContainer: {
+  inactiveTabButton: {
+    backgroundColor: 'transparent',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  activeDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#F9D342',
-    marginTop: 2,
-    position: 'absolute',
-    bottom: -8,
+    flexDirection: 'column',
+    minWidth: 80,
   },
   tabLabel: {
-    fontSize: 9,
-    marginTop: 10,
-    fontWeight: 'bold',
-    letterSpacing: 1.5,
+    fontSize: 10,
+    marginTop: 6,
+    letterSpacing: 1,
+    fontWeight: '700',
+    backgroundColor: 'transparent',
   },
 });

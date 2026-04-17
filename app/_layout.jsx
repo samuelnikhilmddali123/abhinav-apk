@@ -9,6 +9,8 @@ import 'react-native-reanimated';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { SettingsProvider } from '../context/SettingsContext';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -28,70 +30,29 @@ export default function RootLayout() {
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
 
-  const [isReady, setIsReady] = useState(false);
-  const [splashVisible, setSplashVisible] = useState(true);
-  const [videoError, setVideoError] = useState(false);
-  const fadeAnim = useRef(new Animated.Value(1)).current;
-
-  // Expo Router uses Error Boundaries to catch errors in the navigation tree.
   useEffect(() => {
     if (error) throw error;
   }, [error]);
 
   useEffect(() => {
     if (loaded) {
-      SplashScreen.hideAsync().then(() => {
-        setIsReady(true);
-        // Fade out the static splash screen after 2 seconds
-        setTimeout(() => {
-          fadeOut();
-        }, 2000);
-      });
+      SplashScreen.hideAsync();
     }
   }, [loaded]);
-
-  const handleVideoStatusUpdate = (status) => {
-    if (status.didJustFinish) {
-      fadeOut();
-    }
-  };
-
-  const handleError = () => {
-    setVideoError(true);
-    setTimeout(() => {
-      fadeOut();
-    }, 2000); // Wait briefly before fading if fallback is shown
-  };
-
-  const fadeOut = () => {
-    Animated.timing(fadeAnim, {
-      toValue: 0,
-      duration: 500, // Smooth 500ms fade
-      useNativeDriver: true,
-    }).start(() => {
-      setSplashVisible(false);
-    });
-  };
 
   if (!loaded) {
     return null;
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#000' }}>
-      <RootLayoutNav />
-      {splashVisible && (
-        <Animated.View style={[StyleSheet.absoluteFill, { opacity: fadeAnim, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' }]}>
-          <Image
-            source={require('../assets/images/Untitled design (2).png')}
-            style={{ width: 250, height: 250 }}
-            resizeMode="contain"
-          />
-        </Animated.View>
-      )}
-    </View>
+    <SafeAreaProvider>
+      <SafeAreaView style={{ flex: 1, backgroundColor: 'black' }} edges={['top', 'bottom']}>
+        <RootLayoutNav />
+      </SafeAreaView>
+    </SafeAreaProvider>
   );
 }
+
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme();

@@ -5,6 +5,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import YoutubePlayer from 'react-native-youtube-iframe';
 import { WebView } from 'react-native-webview';
 import { useSettings } from '../../context/SettingsContext';
+import NetInfo from '@react-native-community/netinfo';
 import Animated, { useSharedValue, useAnimatedScrollHandler, useAnimatedStyle, interpolate } from 'react-native-reanimated';
 
 const { width, height: SCREEN_H } = Dimensions.get('window');
@@ -22,10 +23,7 @@ const BG_VIDEOS = require('../../assets/images/bg-videos.jpg');
 const YOUTUBE_WATCH = (id) => `https://www.youtube.com/watch?v=${id}`;
 const YOUTUBE_EMBED = (id) => `https://www.youtube.com/embed/${id}?playsinline=1&controls=0&fs=0&modestbranding=1&rel=0&showinfo=0&cc_load_policy=0&iv_load_policy=3`;
 
-const DEFAULT_VIDEOS = [
-  { id: 'vid1', videoId: 'M7lc1UVf-VE', title: 'Luxury Gold Collection' },
-  { id: 'vid2', videoId: 'M7lc1UVf-VE', title: 'Silver Bullion Guide' },
-];
+
 
 function RibbonShards() {
   return (
@@ -188,10 +186,19 @@ export default function VideosScreen() {
   const [tickerWidth, setTickerWidth] = useState(0);
   const [videoIndex, setVideoIndex] = useState(0);
   const [playerVideo, setPlayerVideo] = useState(null);
+  const [isConnected, setIsConnected] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      setIsConnected(state.isConnected);
+    });
+    NetInfo.fetch().then(state => setIsConnected(state.isConnected));
+    return () => unsubscribe();
+  }, []);
 
   const openPlayer = useCallback((item) => {
     if (!item?.videoId) return;
-    setPlayerVideo({ videoId: item.videoId });
+    setPlayerVideo(item);
   }, []);
 
   const closePlayer = useCallback(() => setPlayerVideo(null), []);
@@ -199,7 +206,7 @@ export default function VideosScreen() {
   const playerW = Math.min(width - 32, width);
   const playerH = Math.round(playerW * (9 / 16));
 
-  const rawVideos = settings.videos && settings.videos.length > 0 ? settings.videos : DEFAULT_VIDEOS;
+  const rawVideos = settings.videos || [];
   const { videos, initialCenterIndex } = useMemo(() => {
     if (rawVideos.length <= 1) return { videos: rawVideos, initialCenterIndex: 0 };
     const newestVideo = rawVideos[rawVideos.length - 1];
@@ -251,47 +258,98 @@ export default function VideosScreen() {
 
   const data = [{ key: 'left-spacer' }, ...videos, { key: 'right-spacer' }];
 
+  if (!isConnected) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 20 }]}>
+        <StatusBar barStyle="light-content" />
+        <MaterialCommunityIcons name="wifi-off" size={64} color={GOLD} style={{ marginBottom: 20 }} />
+        <Text style={{ color: '#FFF', fontSize: 24, fontWeight: '900', marginBottom: 10 }}>No Internet</Text>
+        <Text style={{ color: 'rgba(255,255,255,0.6)', textAlign: 'center', marginBottom: 30 }}>Please connect to the internet to view latest videos.</Text>
+        <TouchableOpacity 
+          style={{ backgroundColor: GOLD, paddingHorizontal: 40, paddingVertical: 14, borderRadius: 30 }}
+          onPress={() => NetInfo.fetch().then(s => setIsConnected(s.isConnected))}
+        >
+          <Text style={{ color: '#000', fontWeight: '900' }}>RETRY</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-      <ImageBackground source={BG_VIDEOS} style={styles.background}>
+      <ImageBackground source={BG_VIDEOS} style={styles.background} resizeMode="cover">
         <RibbonShards />
-        <View style={[styles.headerContainer, { paddingTop: Math.max(insets.top, 8) }]}>
-          <Image source={LOGO_IMAGE} style={styles.logo} resizeMode="contain" />
-        </View>
+        <Animated.ScrollView 
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingBottom: 100 }}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={[styles.headerContainer, { paddingTop: insets.top + 10 }]}>
+            <Image source={LOGO_IMAGE} style={styles.logo} resizeMode="contain" />
+          </View>
 
-        <View style={styles.tickerContainer}>
-          <ImageBackground source={TICKER_BG} style={[styles.tickerImage, { height: 40, width: '100%', justifyContent: 'center', overflow: 'hidden' }]} resizeMode="cover">
-            <View style={styles.tickerContentOverlay}>
-              <RNAnimated.View style={[styles.tickerScrollContainer, { transform: [{ translateX: tickerScrollX }] }]}>
-                <Text style={styles.tickerText} onLayout={(e) => { const w = e.nativeEvent.layout.width; if (tickerWidth === 0 && w > 0) setTickerWidth(w); }} numberOfLines={1}>
-                  {settings.ticker}
-                </Text>
-                {Array.from({ length: 10 }).map((_, i) => (<Text key={i} style={styles.tickerText} numberOfLines={1}>{settings.ticker}</Text>))}
-              </RNAnimated.View>
-            </View>
-          </ImageBackground>
-        </View>
+          <View style={styles.tickerContainer}>
+            <ImageBackground source={TICKER_BG} style={[styles.tickerImage, { height: 40, width: '100%', justifyContent: 'center', overflow: 'hidden' }]} resizeMode="cover">
+              <View style={styles.tickerContentOverlay}>
+                <RNAnimated.View style={[styles.tickerScrollContainer, { transform: [{ translateX: tickerScrollX }] }]}>
+                  <Text style={styles.tickerText} onLayout={(e) => { const w = e.nativeEvent.layout.width; if (tickerWidth === 0 && w > 0) setTickerWidth(w); }} numberOfLines={1}>
+                    {settings.ticker}
+                  </Text>
+                  {Array.from({ length: 10 }).map((_, i) => (<Text key={i} style={styles.tickerText} numberOfLines={1}>{settings.ticker}</Text>))}
+                </RNAnimated.View>
+              </View>
+            </ImageBackground>
+          </View>
 
-        <View style={styles.carouselWrapper}>
-          <Animated.FlatList
-            ref={listRef} data={data} keyExtractor={(item, index) => (item.key ? String(item.key) : `v-${index}`)}
-            horizontal showsHorizontalScrollIndicator={false} snapToInterval={ITEM_WIDTH} snapToAlignment="start" decelerationRate="fast"
-            contentContainerStyle={styles.carouselContainer} onScroll={onScroll} scrollEventThrottle={16}
-            onMomentumScrollEnd={onMomentumScrollEnd} windowSize={21} initialNumToRender={5} removeClippedSubviews={false} style={{ overflow: 'visible' }}
-            renderItem={({ item, index }) => {
-              if (item.key === 'left-spacer' || item.key === 'right-spacer') return <View style={{ width: EMPTY_ITEM_SIZE }} />;
-              return <CarouselItem item={item} index={index} scrollX={scrollX} onPlayVideo={openPlayer} isPlaying={playerVideo?.videoId === item.videoId} />;
-            }}
-          />
+          <View style={[styles.carouselWrapper, { height: CARD_WIDTH * (16 / 9) + 80 }]}>
+            <Animated.FlatList
+              ref={listRef} data={data} keyExtractor={(item, index) => (item.key ? String(item.key) : `v-${index}`)}
+              horizontal showsHorizontalScrollIndicator={false} snapToInterval={ITEM_WIDTH} snapToAlignment="start" decelerationRate="fast"
+              contentContainerStyle={styles.carouselContainer} onScroll={onScroll} scrollEventThrottle={16}
+              onMomentumScrollEnd={onMomentumScrollEnd} windowSize={21} initialNumToRender={5} removeClippedSubviews={false} style={{ overflow: 'visible' }}
+              renderItem={({ item, index }) => {
+                if (item.key === 'left-spacer' || item.key === 'right-spacer') return <View style={{ width: EMPTY_ITEM_SIZE }} />;
+                return <CarouselItem item={item} index={index} scrollX={scrollX} onPlayVideo={openPlayer} isPlaying={playerVideo?.id === item.id && playerVideo?.videoId === item.videoId} />;
+              }}
+            />
 
-          {videos.length > 0 && (
-            <View style={styles.pagination}>
-              {videos.map((_, i) => <PaginationDot key={i} index={i} scrollX={scrollX} />)}
-            </View>
-          )}
+            {videos.length > 0 && (
+              <View style={styles.pagination}>
+                {videos.map((_, i) => <PaginationDot key={i} index={i} scrollX={scrollX} />)}
+              </View>
+            )}
+          </View>
 
-        </View>
+          {/* Additional bottom branding or info helps the scroll feel natural */}
+          <View style={{ marginTop: 20, paddingHorizontal: 30, alignItems: 'center', marginBottom: 40 }}>
+             <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: '700', letterSpacing: 1, textAlign: 'center', marginBottom: 20 }}>
+               STAY UPDATED WITH OUR LATEST COLLECTIONS AND MARKET INSIGHTS
+             </Text>
+             
+             {videos.length > 0 && (
+               <View style={{ width: '100%', gap: 15 }}>
+                 {videos.map((vid, idx) => (
+                   <TouchableOpacity 
+                     key={`list-${idx}`} 
+                     style={styles.moreVideoCard}
+                     onPress={() => openPlayer(vid)}
+                   >
+                     <Image 
+                       source={{ uri: `https://img.youtube.com/vi/${vid.videoId}/mqdefault.jpg` }} 
+                       style={styles.moreVideoThumb} 
+                     />
+                     <View style={{ flex: 1, paddingRight: 10 }}>
+                       <Text style={styles.moreVideoTitle} numberOfLines={2}>{vid.title || 'Gold Price Update'}</Text>
+                       <Text style={{ color: 'rgba(255,255,255,0.5)', fontSize: 11, marginTop: 4 }}>Abhinav Gold & Silver</Text>
+                     </View>
+                     <MaterialCommunityIcons name="play-circle-outline" size={28} color={GOLD} />
+                   </TouchableOpacity>
+                 ))}
+               </View>
+             )}
+          </View>
+        </Animated.ScrollView>
       </ImageBackground>
     </View>
   );
@@ -299,7 +357,7 @@ export default function VideosScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
-  background: { flex: 1, width: '100%', minHeight: SCREEN_H, ...StyleSheet.absoluteFillObject },
+  background: { width: '100%', minHeight: SCREEN_H },
   shard: { position: 'absolute', width: width * 0.9, height: SCREEN_H * 0.45, backgroundColor: 'rgba(168, 85, 200, 0.12)', borderRadius: 4 },
   shardNarrow: { position: 'absolute', width: width * 0.35, height: SCREEN_H * 0.55, backgroundColor: 'rgba(220, 100, 180, 0.1)', borderRadius: 4 },
   headerContainer: { width: '100%', alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
@@ -309,7 +367,7 @@ const styles = StyleSheet.create({
   tickerContentOverlay: { flex: 1, justifyContent: 'center', overflow: 'hidden', height: 40 },
   tickerScrollContainer: { flexDirection: 'row', position: 'absolute', left: 0, width: 10000 },
   tickerText: { color: '#FFF', fontSize: 14, fontWeight: '900', letterSpacing: 2, textAlignVertical: 'center' },
-  carouselWrapper: { flex: 1, marginTop: 8, marginBottom: 24, overflow: 'visible' },
+  carouselWrapper: { marginTop: 8, marginBottom: 24, overflow: 'visible' },
   carouselContainer: { alignItems: 'center', paddingVertical: 12, overflow: 'visible' },
   videoCard: { backgroundColor: '#000', borderRadius: 32, borderColor: GOLD, overflow: 'hidden', aspectRatio: 9 / 16, shadowColor: GOLD, shadowOffset: { width: 0, height: 10 } },
   touchableCard: { flex: 1 },
@@ -373,5 +431,26 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: '#000',
+  },
+  moreVideoCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 16,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  moreVideoThumb: {
+    width: 80,
+    height: 60,
+    borderRadius: 8,
+    marginRight: 12,
+    backgroundColor: '#000',
+  },
+  moreVideoTitle: {
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

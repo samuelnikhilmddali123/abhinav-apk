@@ -1,9 +1,10 @@
-import { StyleSheet, View, ImageBackground, StatusBar, Image, Animated, Text, Easing, Dimensions, ScrollView, TouchableOpacity, Linking, Platform } from 'react-native';
+import { StyleSheet, View, ImageBackground, StatusBar, Image, Animated, Text, Easing, Dimensions, ScrollView, TouchableOpacity, Linking, Platform, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useRef, useEffect, useState } from 'react';
 import { MaterialCommunityIcons, FontAwesome5, Ionicons } from '@expo/vector-icons';
 import { useSettings } from '../../context/SettingsContext';
+import NetInfo from '@react-native-community/netinfo';
 import { API_ENDPOINTS } from '../../constants/Config';
 
 const { width } = Dimensions.get('window');
@@ -19,57 +20,86 @@ const TICKER_TEXT = "Welcome to Abhinav Gold & Silver - Quality Purity Guarantee
 
 export default function AlertsScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const scrollX = useRef(new Animated.Value(0)).current;
   const { settings } = useSettings();
   const [tickerWidth, setTickerWidth] = useState(0);
   const [news, setNews] = useState([]);
+  const [isConnected, setIsConnected] = useState(true);
+  const [qrModalVisible, setQrModalVisible] = useState(false);
+  const [selectedQr, setSelectedQr] = useState(null);
+
+  useEffect(() => {
+    const unsubscribe = NetInfo.addEventListener(state => {
+      setIsConnected(state.isConnected);
+    });
+    NetInfo.fetch().then(state => setIsConnected(state.isConnected));
+    return () => unsubscribe();
+  }, []);
+
+  const parseNews = (xml) => {
+    if (!xml) return [];
+    const items = xml.match(/<item>([\s\S]*?)<\/item>/g);
+    if (!items) return [];
+
+    return items
+      .map((it, idx) => {
+        const titleMatch =
+          it.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/) ||
+          it.match(/<title>(.*?)<\/title>/);
+        const title = titleMatch?.[1];
+        const pubDate = it.match(/<pubDate>(.*?)<\/pubDate>/)?.[1];
+        const link = it.match(/<link>(.*?)<\/link>/)?.[1];
+
+        // Format date: "2026-03-02 09:43:12" -> "02 Mar 2026"
+        let dateStr = pubDate || '';
+        if (dateStr.includes('-')) {
+          const [y, m, dayParts] = dateStr.split('-');
+          const monthIndex = parseInt(m) - 1;
+          const day = dayParts.split(' ')[0];
+          const monthNames = [
+            'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+            'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+          ];
+          if (monthIndex >= 0 && monthIndex < 12) {
+            dateStr = `${day} ${monthNames[monthIndex]} ${y}`;
+          }
+        }
+
+        return {
+          id: `news-${idx}`,
+          title: title?.replace(/&amp;/g, '&'),
+          msg: title?.replace(/&amp;/g, '&'),
+          date: dateStr,
+          link,
+          type:
+            title?.toLowerCase().includes('surge') ||
+            title?.toLowerCase().includes('fall') ||
+            title?.toLowerCase().includes('alert')
+              ? 'urgent'
+              : 'info',
+        };
+      })
+      .slice(0, 15);
+  };
 
   useEffect(() => {
     const fetchNews = async () => {
       try {
-        const timestamp = Date.now();
-        // Priority: Production /alerts API
-        const res = await fetch(`${API_ENDPOINTS.ALERTS}?_=${timestamp}`);
-        
+        const res = await fetch('https://www.investing.com/rss/news.rss');
         if (res.ok) {
-          const data = await res.json();
-          if (Array.isArray(data)) {
-            setNews(data);
-            return;
-          } else if (data.alerts && Array.isArray(data.alerts)) {
-            setNews(data.alerts);
-            return;
+          const xml = await res.text();
+          const parsed = parseNews(xml);
+          if (parsed && parsed.length > 0) {
+            setNews(parsed);
           }
         }
-        
-        // Fallback to legacy RSS if backend is not yet providing alerts
-        const rssRes = await fetch(`https://www.investing.com/rss/news_11.rss?_=${timestamp}`);
-        const text = await rssRes.text();
-        if (!text) return;
-        const items = text.match(/<item>([\s\S]*?)<\/item>/g);
-        if (!items) return;
-
-        const parsed = items.map((it, idx) => {
-          const titleMatch = it.match(/<title><!\[CDATA\[(.*?)\]\]><\/title>/) || it.match(/<title>(.*?)<\/title>/);
-          const title = titleMatch?.[1];
-          const pubDate = it.match(/<pubDate>(.*?)<\/pubDate>/)?.[1];
-          return {
-            id: `news-${idx}`,
-            title: title?.replace(/&amp;/g, '&'),
-            msg: title?.replace(/&amp;/g, '&'),
-            date: pubDate || '',
-            type: (title?.toLowerCase().includes('surge') || title?.toLowerCase().includes('fall')) ? 'urgent' : 'info'
-          };
-        }).slice(0, 10);
-        setNews(parsed);
-      } catch (error) {
-        console.log('Error fetching alerts from backend/rss:', error);
+      } catch (err) {
+        console.log('Failed to fetch news:', err);
       }
     };
 
     fetchNews();
-    const interval = setInterval(fetchNews, 60000); // Update every minute
+    const interval = setInterval(fetchNews, 60000 * 5); // Update every 5 minutes
     return () => clearInterval(interval);
   }, []);
 
@@ -96,12 +126,33 @@ export default function AlertsScreen() {
     Linking.openURL(url);
   };
 
+  const handleQrPress = (qr) => {
+    setSelectedQr(qr);
+    setQrModalVisible(true);
+  };
+
+  if (!isConnected) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: 20, backgroundColor: '#001A33' }]}>
+        <StatusBar barStyle="light-content" />
+        <MaterialCommunityIcons name="wifi-off" size={64} color="#F9D342" style={{ marginBottom: 20 }} />
+        <Text style={{ color: '#FFF', fontSize: 24, fontWeight: '900', marginBottom: 10 }}>Disconnected</Text>
+        <Text style={{ color: 'rgba(255,255,255,0.6)', textAlign: 'center', marginBottom: 30 }}>Enable data or Wi-Fi to receive the latest market alerts.</Text>
+        <TouchableOpacity 
+          style={{ backgroundColor: '#F9D342', paddingHorizontal: 40, paddingVertical: 14, borderRadius: 30 }}
+          onPress={() => NetInfo.fetch().then(s => setIsConnected(s.isConnected))}
+        >
+          <Text style={{ color: '#000', fontWeight: '900' }}>RETRY</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
       <ImageBackground source={BG_IMAGE} style={styles.background} resizeMode="cover">
-        
-        <View style={[styles.headerContainer, { paddingTop: insets.top + 20 }]}>
+        <View style={styles.headerContainer}>
           <Image source={LOGO_IMAGE} style={styles.logo} resizeMode="contain" />
         </View>
 
@@ -146,7 +197,7 @@ export default function AlertsScreen() {
 
             {news.length > 0 ? (
               news.map((item) => (
-                <View key={item.id} style={[styles.newsCard, item.type === 'urgent' ? styles.urgentBorder : styles.infoBorder]}>
+                <View key={item.id} style={styles.newsCard}>
                   <View style={styles.newsCardHeader}>
                     <View>
                       <Text style={styles.newsTitle}>{item.title}</Text>
@@ -155,9 +206,7 @@ export default function AlertsScreen() {
                         <Text style={styles.newsDateText}>{item.date}</Text>
                       </View>
                     </View>
-                    <View style={[styles.typeBadge, item.type === 'urgent' ? styles.urgentBadge : styles.infoBadge]}>
-                      <Text style={[styles.typeBadgeText, item.type === 'urgent' ? styles.urgentBadgeText : styles.infoBadgeText]}>{item.type.toUpperCase()}</Text>
-                    </View>
+                    {/* URGENT badge removed */}
                   </View>
                   <Text style={styles.newsMsg}>{item.msg}</Text>
                 </View>
@@ -175,11 +224,11 @@ export default function AlertsScreen() {
             <View style={styles.footerSection}>
               <Text style={styles.footerLabel}>BANK & LOCATION QR</Text>
               <View style={styles.qrRow}>
-                <TouchableOpacity style={styles.qrContainer} onPress={() => openLink('https://wa.me/919441055916')}>
+                <TouchableOpacity style={styles.qrContainer} onPress={() => handleQrPress(QR_BANK)}>
                   <Image source={QR_BANK} style={styles.qrImage} resizeMode="contain" />
                   <Text style={styles.qrLabelText}>BANK DETAILS</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.qrContainer} onPress={() => openLink('https://www.google.com/maps?q=16.2366,80.6477')}>
+                <TouchableOpacity style={styles.qrContainer} onPress={() => handleQrPress(QR_LOCATION)}>
                   <Image source={QR_LOCATION} style={styles.qrImage} resizeMode="contain" />
                   <Text style={styles.qrLabelText}>OUR LOCATION</Text>
                 </TouchableOpacity>
@@ -267,6 +316,46 @@ export default function AlertsScreen() {
           </View>
         </ScrollView>
       </ImageBackground>
+
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={qrModalVisible}
+        onRequestClose={() => setQrModalVisible(false)}
+      >
+        <TouchableOpacity 
+          style={styles.modalOverlay} 
+          activeOpacity={1} 
+          onPress={() => setQrModalVisible(false)}
+        >
+          <View style={styles.modalContent}>
+            <TouchableOpacity 
+              style={styles.closeBtn} 
+              onPress={() => setQrModalVisible(false)}
+            >
+              <MaterialCommunityIcons name="close" size={28} color="#FFF" />
+            </TouchableOpacity>
+            
+            {selectedQr && (
+              <Image 
+                source={selectedQr} 
+                style={styles.fullQrImage} 
+                resizeMode="contain" 
+              />
+            )}
+
+            {selectedQr === QR_BANK && (
+              <View style={styles.bankDetailTextContainer}>
+                <Text style={styles.bankDetailText}>Name : Abhinav Jewellers</Text>
+                <Text style={styles.bankDetailText}>IFSC CODE : INDB0001882</Text>
+                <Text style={styles.bankDetailText}>Account Number : 259440138353</Text>
+              </View>
+            )}
+            
+            <Text style={styles.modalHint}>Tap anywhere to close</Text>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -345,9 +434,7 @@ const styles = StyleSheet.create({
     padding: 20,
     marginBottom: 15,
     borderLeftWidth: 8,
-  },
-  urgentBorder: {
-    borderColor: '#E6007A', // Magenta
+    borderColor: '#F9D342', // Gold border for all
   },
   infoBorder: {
     borderColor: '#4A90E2', // Blue
@@ -381,18 +468,12 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
   },
-  urgentBadge: {
-    backgroundColor: 'rgba(230,0,122,0.15)',
-  },
   infoBadge: {
     backgroundColor: 'rgba(74,144,226,0.15)',
   },
   typeBadgeText: {
     fontSize: 9,
     fontWeight: 'bold',
-  },
-  urgentBadgeText: {
-    color: '#E6007A',
   },
   infoBadgeText: {
     color: '#4A90E2',
@@ -563,5 +644,51 @@ const styles = StyleSheet.create({
     width: 80,
     height: 30,
     opacity: 0.6,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '90%',
+    backgroundColor: '#FFF',
+    borderRadius: 20,
+    padding: 20,
+    alignItems: 'center',
+  },
+  closeBtn: {
+    position: 'absolute',
+    top: -50,
+    right: 0,
+    padding: 10,
+  },
+  fullQrImage: {
+    width: width * 0.8,
+    height: width * 0.8,
+  },
+  modalHint: {
+    color: '#000',
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginTop: 15,
+    opacity: 0.5,
+  },
+  bankDetailTextContainer: {
+    marginTop: 20,
+    width: '100%',
+    backgroundColor: '#f8fafc',
+    padding: 15,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  bankDetailText: {
+    color: '#0F172A',
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 5,
+    textAlign: 'center',
   },
 });

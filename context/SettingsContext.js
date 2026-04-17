@@ -28,6 +28,7 @@ const DEFAULT_SETTINGS = {
     silver999: true,
   },
   videos: [],
+  music: null,
 };
 
 /** Same source as abhanav-website `GET /api/videos` — `{ videoId, title }[]` */
@@ -53,15 +54,15 @@ function mapBackendToAppSettings(data) {
 
   return {
     rateModifications: {
-      gold999_buy: src?.goldOffset?.value ?? 0,
-      silver999_buy: src?.silverOffset?.value ?? 0,
+      gold999_buy: src?.goldOffset?.value ?? src?.gold?.value ?? 0,
+      silver999_buy: src?.silverOffset?.value ?? src?.silver?.value ?? 0,
       gold999_sell: src?.baseModifications?.gold999?.value ?? 0,
       silver999_sell: src?.baseModifications?.silver999?.value ?? 0,
       isModifiedMode: src?.showModified ?? false,
     },
     ratesPageModifications: {
-      gold999: src?.ratesPage?.gold?.value ?? 0,
-      silver999: src?.ratesPage?.silver?.value ?? 0,
+      gold999: src?.ratesPage?.goldTable?.value ?? src?.ratesPage?.gold?.value ?? 0,
+      silver999: src?.ratesPage?.silverTable?.value ?? src?.ratesPage?.silver?.value ?? 0,
       isModifiedMode: src?.ratesPage?.showModified ?? false,
     },
     ticker: src?.ticker ?? DEFAULT_SETTINGS.ticker,
@@ -75,7 +76,6 @@ function mapBackendToAppSettings(data) {
       closeTime: src?.marketStatus?.closeTime ?? DEFAULT_SETTINGS.marketStatus.closeTime,
     },
     stockStatus: src?.stockOverrides ?? src?.stockStatus ?? DEFAULT_SETTINGS.stockStatus,
-    videos: Array.isArray(src?.videos) ? src.videos : DEFAULT_SETTINGS.videos,
   };
 }
 
@@ -83,44 +83,71 @@ export function SettingsProvider({ children }) {
   const [isLoading, setIsLoading] = useState(true);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
 
-  const fetchSettings = useCallback(async () => {
+  const fetchMusicSettings = useCallback(async () => {
+    if (!API_ENDPOINTS.MUSIC) return;
     try {
-      // Website uses `/api/rates/settings` for offsets/ticker/stock (same as web RateContext).
-      let res = await fetch(`${API_ENDPOINTS.RATE_SETTINGS}?_=${Date.now()}`, { cache: 'no-store' });
-      if (!res.ok) {
-        res = await fetch(`${API_ENDPOINTS.SETTINGS}?_=${Date.now()}`, { cache: 'no-store' });
-      }
-      if (!res.ok) return;
-      const data = await res.json();
-      const mapped = mapBackendToAppSettings(data);
-
-      // Website loads the video gallery from `GET /api/videos` (separate collection), not only RateSettings.
-      let videos = mapped.videos;
-      try {
-        const vRes = await fetch(`${API_ENDPOINTS.VIDEOS}?_=${Date.now()}`, { cache: 'no-store' });
-        if (vRes.ok) {
-          const list = await vRes.json();
-          if (Array.isArray(list)) {
-            videos = normalizeVideosFromApi(list);
-          }
+      const res = await fetch(API_ENDPOINTS.MUSIC);
+      if (res.ok) {
+        let data = await res.json();
+        // Handle both single object and list formats
+        const musicData = Array.isArray(data) ? data[0] : data;
+        if (musicData) {
+          setSettings(prev => ({ ...prev, music: musicData }));
         }
-      } catch (e) {
-        /* keep videos from settings */
       }
-
-      setSettings((prev) => ({ ...prev, ...mapped, videos }));
     } catch (e) {
-      // Keep last-known settings on network failure.
+      console.log('Failed to fetch music settings:', e);
+    }
+  }, []);
+
+  const fetchSettings = useCallback(async () => {
+    if (!API_ENDPOINTS.RATE_SETTINGS) {
+      setIsLoading(false);
+      return;
+    }
+    try {
+      const res = await fetch(API_ENDPOINTS.RATE_SETTINGS);
+      if (res.ok) {
+        const data = await res.json();
+        const mapped = mapBackendToAppSettings(data);
+        setSettings(prev => ({ ...prev, ...mapped }));
+      }
+    } catch (e) {
+      console.log('Failed to fetch settings:', e);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
+  const fetchVideos = useCallback(async () => {
+    if (!API_ENDPOINTS.VIDEOS) return;
+    try {
+      const res = await fetch(API_ENDPOINTS.VIDEOS);
+      if (res.ok) {
+        const data = await res.json();
+        const normalized = normalizeVideosFromApi(data);
+        setSettings(prev => ({ ...prev, videos: normalized }));
+      }
+    } catch (e) {
+      console.log('Failed to fetch videos:', e);
+    }
+  }, []);
+
   useEffect(() => {
     fetchSettings();
-    const interval = setInterval(fetchSettings, 30000);
+    const interval = setInterval(fetchSettings, 3000);
     return () => clearInterval(interval);
   }, [fetchSettings]);
+
+  useEffect(() => {
+    fetchMusicSettings();
+    fetchVideos();
+    const interval = setInterval(() => {
+        fetchMusicSettings();
+        fetchVideos();
+    }, 60000); // 1 minute for static assets
+    return () => clearInterval(interval);
+  }, [fetchMusicSettings, fetchVideos]);
 
   const value = useMemo(() => ({ settings, isLoading, refresh: fetchSettings }), [settings, isLoading, fetchSettings]);
 
