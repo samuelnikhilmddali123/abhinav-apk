@@ -5,6 +5,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Platform, Dimensions } from '
 import { stopAllScreenMusicOnTabChange } from '../../constants/tabScreenMusicStop';
 import { LinearGradient } from 'expo-linear-gradient';
 import { BlurView } from 'expo-blur';
+import * as Haptics from 'expo-haptics';
 
 const { width } = Dimensions.get('window');
 
@@ -20,7 +21,7 @@ function CustomTabBar({ state, descriptors, navigation }) {
 
   return (
     <View style={styles.wrapper}>
-      <BlurView intensity={85} tint="dark" style={styles.container}>
+      <BlurView intensity={90} tint="dark" style={styles.container}>
         {state.routes.map((route, index) => {
           const { options } = descriptors[route.key];
           const label =
@@ -34,6 +35,7 @@ function CustomTabBar({ state, descriptors, navigation }) {
           const isHome = route.name === 'index';
 
           const onPress = () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             const event = navigation.emit({
               type: 'tabPress',
               target: route.key,
@@ -81,7 +83,7 @@ function CustomTabBar({ state, descriptors, navigation }) {
               )}
               <Text style={[
                 styles.tabLabel, 
-                { color: isFocused ? '#FFD700' : '#D4AF37', opacity: isFocused ? 1 : 0.6 }
+                { color: isFocused ? '#FFD700' : '#D4AF37', opacity: isFocused ? 1 : 0.45 }
               ]}>
                 {label.toUpperCase()}
               </Text>
@@ -137,18 +139,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     width: width * 0.92,
     height: 85,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)', // Translucent black for glass effect
+    backgroundColor: 'rgba(255, 255, 255, 0.05)', // Frosted glass sheen
     borderRadius: 45,
     alignItems: 'center',
     justifyContent: 'space-around',
     paddingHorizontal: 10,
-    borderWidth: 1.2,
-    borderColor: 'rgba(212, 175, 55, 0.35)',
+    borderWidth: 1.0,
+    borderColor: 'rgba(255, 255, 255, 0.15)', // Glass edge highlight
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.4,
-    shadowRadius: 15,
-    elevation: 20,
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 15,
     overflow: 'hidden', // Required for BlurView rounding
   },
 
@@ -175,6 +177,7 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0, 0, 0, 0.5)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
+    opacity: 0.5,
   },
   tabLabel: {
     fontSize: 9,

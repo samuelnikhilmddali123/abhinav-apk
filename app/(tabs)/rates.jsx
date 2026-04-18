@@ -5,6 +5,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { FontAwesome } from '@expo/vector-icons';
 import { useNetInfo } from '@react-native-community/netinfo';
 import { Audio } from 'expo-av';
+import * as Haptics from 'expo-haptics';
 import { fetchRatesIdMap } from '../../constants/liveRates';
 import { useSettings } from '../../context/SettingsContext';
 import { API_ENDPOINTS, FILE_ROOT } from '../../constants/Config';
@@ -263,6 +264,7 @@ export default function RatesScreen() {
   }, [stopAndResetMusic, settings.music]);
 
   const toggleMusic = React.useCallback(async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (isMusicOn) {
       await stopAndResetMusic();
       return;

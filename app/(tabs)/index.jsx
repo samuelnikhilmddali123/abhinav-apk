@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { WebView } from 'react-native-webview';
 import * as NetInfo from '@react-native-community/netinfo';
+import * as Haptics from 'expo-haptics';
 import { WEBSITE_URL } from '../../constants/Config';
 
 const WEB_URL = WEBSITE_URL;
@@ -104,6 +105,7 @@ export default function HomeScreen() {
         <TouchableOpacity 
           style={styles.retryButton} 
           onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             if (webViewRef.current) webViewRef.current.reload();
           }}
         >
@@ -172,7 +174,7 @@ const styles = StyleSheet.create({
   webView: { flex: 1, backgroundColor: 'black' },
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.3)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 10,

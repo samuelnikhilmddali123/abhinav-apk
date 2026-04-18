@@ -7,6 +7,7 @@ import { WebView } from 'react-native-webview';
 import { useSettings } from '../../context/SettingsContext';
 import { useNetInfo } from '@react-native-community/netinfo';
 import Animated, { useSharedValue, useAnimatedScrollHandler, useAnimatedStyle, interpolate } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 
 const { width, height: SCREEN_H } = Dimensions.get('window');
 const ITEM_WIDTH = width * 0.7;
@@ -38,6 +39,7 @@ function RibbonShards() {
 
 function CarouselItem({ item, index, scrollX, onPlayVideo, isPlaying }) {
   const openVideo = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (item.videoId) onPlayVideo?.(item);
   }, [item, onPlayVideo]);
 
