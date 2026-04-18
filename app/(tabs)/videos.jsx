@@ -276,7 +276,7 @@ export default function VideosScreen() {
         <RibbonShards />
         <Animated.ScrollView 
           style={{ flex: 1 }}
-          contentContainerStyle={{ paddingBottom: 100 }}
+          contentContainerStyle={{ paddingBottom: 130 }}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl

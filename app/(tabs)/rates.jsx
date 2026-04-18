@@ -500,7 +500,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 24,
+    paddingBottom: 130,
   },
   headerImage: {
     width: width,

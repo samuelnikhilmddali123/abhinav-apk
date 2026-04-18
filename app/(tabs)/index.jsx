@@ -35,14 +35,19 @@ const injectedJS = `
   hideNavigation();
   setInterval(hideNavigation, 1000);
 
-  // --- REFRESH FIX ---
-  function allowTopPull() {
+  function allowLayoutFix() {
     const body = document.body;
     if (body) {
       body.style.paddingTop = "1px";
+      body.style.paddingBottom = "100px";
     }
+    // Disable zoom
+    const meta = document.createElement('meta');
+    meta.name = 'viewport';
+    meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+    document.getElementsByTagName('head')[0].appendChild(meta);
   }
-  allowTopPull();
+  allowLayoutFix();
 
   // Scroll Position for logic
   window.addEventListener('scroll', function() {
@@ -114,7 +119,7 @@ export default function HomeScreen() {
       
       <View style={styles.webViewWrapper}>
         <ScrollView
-          contentContainerStyle={{ flex: 1 }}
+          contentContainerStyle={{ flexGrow: 1 }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -139,13 +144,16 @@ export default function HomeScreen() {
               setIsLoading(false);
               setRefreshing(false);
             }}
-            pullToRefreshEnabled={false} // Disable native to use ours
+            pullToRefreshEnabled={false}
             bounces={true}
             overScrollMode="always"
             nestedScrollEnabled={true}
             startInLoadingState={true}
             javaScriptEnabled={true}
             domStorageEnabled={true}
+            scalesPageToFit={false}
+            setBuiltInZoomControls={false}
+            setDisplayZoomControls={false}
           />
         </ScrollView>
         {isLoading && !refreshing && (

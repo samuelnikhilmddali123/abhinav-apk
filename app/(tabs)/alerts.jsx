@@ -520,7 +520,7 @@ const styles = StyleSheet.create({
     marginTop: 40,
     paddingTop: 30,
     paddingHorizontal: 20,
-    paddingBottom: Platform.OS === 'ios' ? 100 : 80, // Space for BottomNav
+    paddingBottom: Platform.OS === 'ios' ? 140 : 120, // Space for BottomNav
   },
   footerSection: {
     marginBottom: 30,

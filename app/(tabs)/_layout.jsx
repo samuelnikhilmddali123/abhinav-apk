@@ -1,12 +1,12 @@
 import React, { useEffect, useRef } from 'react';
-import { FontAwesome } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, Dimensions } from 'react-native';
 import { stopAllScreenMusicOnTabChange } from '../../constants/tabScreenMusicStop';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 
-function TabBarIcon(props) {
-  return <FontAwesome size={24} style={{ marginBottom: -3 }} {...props} />;
-}
+const { width } = Dimensions.get('window');
 
 function CustomTabBar({ state, descriptors, navigation }) {
   const prevIndexRef = useRef(state.index);
@@ -19,9 +19,8 @@ function CustomTabBar({ state, descriptors, navigation }) {
   }, [state.index]);
 
   return (
-    <View style={styles.tabBarContainer}>
-      <View style={styles.topBorder} />
-      <View style={styles.tabBar}>
+    <View style={styles.wrapper}>
+      <BlurView intensity={85} tint="dark" style={styles.container}>
         {state.routes.map((route, index) => {
           const { options } = descriptors[route.key];
           const label =
@@ -32,6 +31,7 @@ function CustomTabBar({ state, descriptors, navigation }) {
               : route.name;
 
           const isFocused = state.index === index;
+          const isHome = route.name === 'index';
 
           const onPress = () => {
             const event = navigation.emit({
@@ -45,11 +45,8 @@ function CustomTabBar({ state, descriptors, navigation }) {
             }
           };
 
-          const activeColor = '#F9D342'; // Gold
-          const inactiveColor = '#8E8E93';
-
           const iconName = route.name === 'index' ? 'home' :
-                           route.name === 'rates' ? 'bar-chart' :
+                           route.name === 'rates' ? 'chart-line' :
                            route.name === 'alerts' ? 'bell' : 
                            'play-circle';
 
@@ -57,21 +54,41 @@ function CustomTabBar({ state, descriptors, navigation }) {
             <TouchableOpacity
               key={index}
               onPress={onPress}
-              style={isFocused ? styles.activeTabButton : styles.inactiveTabButton}
+              activeOpacity={0.8}
+              style={[
+                styles.tabButton,
+                isHome && { marginTop: 15 } // Keeps the Home button offset as preferred
+              ]}
             >
-              <FontAwesome
-                name={iconName}
-                size={20}
-                color={isFocused ? "#FFD700" : "#9CA3AF"}
-                style={{ backgroundColor: 'transparent' }}
-              />
-              <Text style={[styles.tabLabel, { color: isFocused ? "#FFD700" : "#9CA3AF" }]}>
+              {isFocused ? (
+                <LinearGradient
+                  colors={['#FFD700', '#B8860B']}
+                  style={styles.activeIndicator}
+                >
+                  <MaterialCommunityIcons
+                    name={iconName}
+                    size={28}
+                    color="#000"
+                  />
+                </LinearGradient>
+              ) : (
+                <MaterialCommunityIcons
+                  name={iconName}
+                  size={26}
+                  color="#D4AF37"
+                  style={styles.inactiveIcon}
+                />
+              )}
+              <Text style={[
+                styles.tabLabel, 
+                { color: isFocused ? '#FFD700' : '#D4AF37', opacity: isFocused ? 1 : 0.6 }
+              ]}>
                 {label.toUpperCase()}
               </Text>
             </TouchableOpacity>
           );
         })}
-      </View>
+      </BlurView>
     </View>
   );
 }
@@ -82,10 +99,11 @@ export default function TabLayout() {
       tabBar={(props) => <CustomTabBar {...props} />}
       screenOptions={{
         headerShown: true,
+        tabBarTransparent: true,
         headerStyle: {
           backgroundColor: '#1A0B2E',
         },
-        headerTintColor: '#F9D342', // Gold header text
+        headerTintColor: '#F9D342',
         headerTitleStyle: {
           fontWeight: '300',
           letterSpacing: 2,
@@ -107,53 +125,64 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
-  tabBarContainer: {
-    backgroundColor: '#0F051D',
-    paddingBottom: Platform.OS === 'ios' ? 25 : 12,
+  wrapper: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    paddingBottom: Platform.OS === 'ios' ? 25 : 15,
   },
-  topBorder: {
-    height: 1,
-    backgroundColor: '#D4AF37',
-    opacity: 0.8,
-  },
-  tabBar: {
+  container: {
     flexDirection: 'row',
+    width: width * 0.92,
     height: 85,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)', // Translucent black for glass effect
+    borderRadius: 45,
+    alignItems: 'center',
     justifyContent: 'space-around',
-    alignItems: 'center',
     paddingHorizontal: 10,
-    backgroundColor: '#1A002B',
+    borderWidth: 1.2,
+    borderColor: 'rgba(212, 175, 55, 0.35)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.4,
+    shadowRadius: 15,
+    elevation: 20,
+    overflow: 'hidden', // Required for BlurView rounding
   },
-  activeTabButton: {
-    backgroundColor: '#30084a',
-    borderRadius: 18,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderWidth: 1.5,
-    borderColor: '#D4AF37',
-    shadowColor: '#D4AF37',
+
+  tabButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+  },
+  activeIndicator: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.6,
-    shadowRadius: 10,
-    elevation: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'column',
-    minWidth: 80,
+    shadowRadius: 5,
+    elevation: 5,
   },
-  inactiveTabButton: {
-    backgroundColor: 'transparent',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'column',
-    minWidth: 80,
+  inactiveIcon: {
+    marginBottom: 4,
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
   },
   tabLabel: {
-    fontSize: 10,
-    marginTop: 6,
+    fontSize: 9,
+    fontWeight: '800',
     letterSpacing: 1,
-    fontWeight: '700',
-    backgroundColor: 'transparent',
   },
 });
+
+
+
+
