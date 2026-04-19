@@ -59,6 +59,15 @@ const injectedJS = `
       })
     );
   });
+
+  // Force black labels for spot bar to ensure readability in app
+  const style = document.createElement('style');
+  style.innerHTML = \`
+    .flex.flex-col.items-center span { color: black !important; }
+    span[class*="text-slate-800"] { color: black !important; }
+    .animate-ticker-rtl span { color: white !important; font-weight: 900 !important; }
+  \`;
+  document.head.appendChild(style);
 })();
 `;
 
