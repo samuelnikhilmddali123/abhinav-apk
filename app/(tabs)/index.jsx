@@ -21,6 +21,8 @@ const GOLD_COLOR = '#FFD700';
 const injectedJS = `
 (function() {
   function hideNavigation() {
+    const isHome = window.location.pathname === '/' || window.location.pathname === '/home1' || window.location.pathname.endsWith('/');
+    
     const footerSelectors = [
       'footer', '.footer', '.bottom-nav', '.mobile-nav', 
       '.navbar-fixed-bottom', '.bottom-menu', '#footer', 
@@ -30,6 +32,21 @@ const injectedJS = `
       const elements = document.querySelectorAll(selector);
       elements.forEach(el => {
         el.style.setProperty('display', 'none', 'important');
+      });
+    });
+
+    const topHeaderSelectors = [
+      '.top-nav-wrapper', 
+      'div.absolute.top-0.w-full.z-50',
+      'div.absolute.top-0',
+      'header'
+    ];
+    topHeaderSelectors.forEach(selector => {
+      const elements = document.querySelectorAll(selector);
+      elements.forEach(el => {
+        if (el.innerText.includes('ABHINAV') || el.querySelector('img[src*="logo"]')) {
+          el.style.setProperty('display', 'none', 'important');
+        }
       });
     });
   }
