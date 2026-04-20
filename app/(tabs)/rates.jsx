@@ -22,15 +22,14 @@ const RATE_UP_COLOR = '#4ade80';
 const RATE_DOWN_COLOR = '#f87171';
 const RATE_DEFAULT_TEXT_COLOR = '#F0C733';
 
-const AnimatedRateText = ({ value, trend, style }) => {
+const AnimatedRateText = ({ value, trend, style, defaultColor = RATE_DEFAULT_TEXT_COLOR }) => {
   const progress = useRef(new Animated.Value(1)).current;
-  const prevColorRef = useRef(RATE_DEFAULT_TEXT_COLOR);
+  const prevColorRef = useRef(defaultColor);
 
   const targetColor =
-    trend === 'increase' ? RATE_UP_COLOR : trend === 'decrease' ? RATE_DOWN_COLOR : RATE_DEFAULT_TEXT_COLOR;
+    trend === 'increase' ? RATE_UP_COLOR : trend === 'decrease' ? RATE_DOWN_COLOR : defaultColor;
 
   useEffect(() => {
-    const startColor = prevColorRef.current;
     prevColorRef.current = targetColor;
     progress.setValue(0);
     Animated.timing(progress, {
@@ -48,10 +47,10 @@ const AnimatedRateText = ({ value, trend, style }) => {
   return <Animated.Text style={[style, { color }]}>{value}</Animated.Text>;
 };
 
-const RetailRow = ({ purity, rate10g, trend, isLast = false }) => (
+const RetailRow = ({ purity, rate10g, trend, isLast = false, defaultColor = RATE_DEFAULT_TEXT_COLOR }) => (
   <View style={[styles.retailRow, isLast && { borderBottomWidth: 0 }]}>
     <Text style={[styles.retailColText, { flex: 1, textAlign: 'left', paddingLeft: 10 }]}>{purity}</Text>
-    <AnimatedRateText style={[styles.retailColRate, { flex: 1, textAlign: 'right', paddingRight: 10 }]} value={rate10g} trend={trend} />
+    <AnimatedRateText style={[styles.retailColRate, { flex: 1, textAlign: 'right', paddingRight: 10 }]} value={rate10g} trend={trend} defaultColor={defaultColor} />
   </View>
 );
 
@@ -82,11 +81,16 @@ export default function RatesScreen() {
           if (pStr && cStr && pStr !== '-' && cStr !== '-') {
             const p = parseFloat(String(pStr).replace(/,/g, ''));
             const c = parseFloat(String(cStr).replace(/,/g, ''));
-            if (!isNaN(p) && !isNaN(c) && p !== c) {
-              next[id] = {
-                type: c > p ? 'increase' : 'decrease',
-                expiry: now + 5000
-              };
+            if (!isNaN(p) && !isNaN(c)) {
+              if (p !== c) {
+                next[id] = {
+                  type: c > p ? 'increase' : 'decrease',
+                  expiry: now + 5000
+                };
+              } else {
+                // If price is same, remove trend immediately to show stable color
+                delete next[id];
+              }
             }
           }
 
@@ -456,6 +460,7 @@ export default function RatesScreen() {
                         return '\u20B9' + per10g.toLocaleString('en-IN');
                     })()}
                     trend={getRateChangeType('2987')}
+                    defaultColor="#CFE9E1"
                   />
                 </View>
               </View>
