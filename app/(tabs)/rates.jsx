@@ -78,19 +78,37 @@ export default function RatesScreen() {
         Object.keys(rawRates).forEach(id => {
           const pStr = currentRates[id]?.ask;
           const cStr = rawRates[id]?.ask;
-          if (pStr && cStr && pStr !== '-' && cStr !== '-') {
-            const p = parseFloat(String(pStr).replace(/,/g, ''));
-            const c = parseFloat(String(cStr).replace(/,/g, ''));
-            if (!isNaN(p) && !isNaN(c)) {
-              if (p !== c) {
-                next[id] = {
-                  type: c > p ? 'increase' : 'decrease',
-                  expiry: now + 2000
-                };
-              }
+          
+          const parseNum = (v) => {
+            if (v === undefined || v === null || v === '-') return NaN;
+            const s = String(v).replace(/,/g, '');
+            return parseFloat(s);
+          };
+
+          const p = parseNum(pStr);
+          const c = parseNum(cStr);
+
+          if (!isNaN(p) && !isNaN(c)) {
+            // 6-decimal absolute numeric comparison
+            const rNV = Number(c.toFixed(6));
+            const rOV = Number(p.toFixed(6));
+
+            if (Math.abs(rNV - rOV) > 0.0000001) {
+              // CHANGE: Green/Red immediately
+              next[id] = {
+                type: rNV > rOV ? 'increase' : 'decrease',
+                expiry: now + 2000
+              };
+            } else if (next[id] && now < next[id].expiry) {
+              // NO CHANGE: Keep previous color until expiry (2s persistence)
+              // Keep existing next[id] as is
+            } else {
+              // STABLE: Clear trend after 2s
+              delete next[id];
             }
           }
 
+          // Cleanup generic old entries
           if (next[id] && now > next[id].expiry) {
             delete next[id];
           }
