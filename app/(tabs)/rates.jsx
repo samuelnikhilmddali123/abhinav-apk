@@ -85,11 +85,8 @@ export default function RatesScreen() {
               if (p !== c) {
                 next[id] = {
                   type: c > p ? 'increase' : 'decrease',
-                  expiry: now + 5000
+                  expiry: now + 2000
                 };
-              } else {
-                // If price is same, remove trend immediately to show stable color
-                delete next[id];
               }
             }
           }
