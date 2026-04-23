@@ -89,28 +89,23 @@ export default function RatesScreen() {
           const c = parseNum(cStr);
 
           if (!isNaN(p) && !isNaN(c)) {
-            // 6-decimal absolute numeric comparison
-            const rNV = Number(c.toFixed(6));
-            const rOV = Number(p.toFixed(6));
+            // ─── PERFECT UNIFIED TREND LOGIC ───
+            const rNV = parseFloat(c.toFixed(6));
+            const rOV = parseFloat(p.toFixed(6));
 
             if (Math.abs(rNV - rOV) > 0.0000001) {
-              // CHANGE: Green/Red immediately
+              // PRICE MOVED: Apply color immediately
               next[id] = {
                 type: rNV > rOV ? 'increase' : 'decrease',
                 expiry: now + 2000
               };
             } else if (next[id] && now < next[id].expiry) {
-              // NO CHANGE: Keep previous color until expiry (2s persistence)
-              // Keep existing next[id] as is
+              // STABILITY PROTECTION: Keep previous color until 2s expiry
+              // No change to next[id]
             } else {
-              // STABLE: Clear trend after 2s
+              // STABLE: Effectively no movement for >2s
               delete next[id];
             }
-          }
-
-          // Cleanup generic old entries
-          if (next[id] && now > next[id].expiry) {
-            delete next[id];
           }
         });
         return next;
