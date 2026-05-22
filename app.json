@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "Abhinav Gold and Silver",
+    "slug": "jewllery-expo",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/Untitled design (2).png",
+    "scheme": "jewelryexpo",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "predictiveBackGestureEnabled": false,
+      "package": "com.nikhil_2003.jewelryexpo",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/Untitled design (2).png",
+        "backgroundColor": "#000000"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "c6dc941f-a536-4085-916a-324b7c755a02"
+      }
+    }
+  }
+}
