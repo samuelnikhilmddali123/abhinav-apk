@@ -1,4 +1,4 @@
-package com.nikhil_2003.jewelryexpo
+package abhinav.com
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

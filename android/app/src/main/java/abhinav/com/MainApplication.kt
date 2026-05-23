@@ -1,4 +1,4 @@
-package com.nikhil_2003.jewelryexpo
+package abhinav.com
 
 import android.app.Application
 import android.content.res.Configuration

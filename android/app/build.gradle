@@ -87,9 +87,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'com.nikhil_2003.jewelryexpo'
+    namespace 'abhinav.com'
     defaultConfig {
-        applicationId 'com.nikhil_2003.jewelryexpo'
+        applicationId 'abhinav.com'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
