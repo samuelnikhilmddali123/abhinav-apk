@@ -1,4 +1,4 @@
-package abhinav.com
+package com.stackvill.abhinavgoldsilver
 
 import android.app.Application
 import android.content.res.Configuration
