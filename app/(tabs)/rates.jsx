@@ -62,25 +62,35 @@ const LocalRateRow = ({ product, buy, sell, buyTrend, sellTrend, isLast = false 
 
   return (
     <View style={[styles.rowContainer, isLast && { borderBottomWidth: 0 }]}>
-      <View style={{ flex: 1.4, flexDirection: 'row', alignItems: 'center' }}>
+      <View style={{ flex: 1.8, flexDirection: 'row', alignItems: 'center' }}>
         <View style={[styles.productIndicator, { backgroundColor: dotColor }]} />
         <View style={{ flexDirection: 'column' }}>
           <Text style={styles.cellTextLeftName}>{name}</Text>
           {sub ? <Text style={styles.cellTextLeftSub}>{sub}</Text> : null}
         </View>
       </View>
-      <AnimatedRateText
-        style={[styles.cellTextRight, { flex: 1 }]}
-        value={buy}
-        trend={buyTrend}
-        defaultColor="#FFFFFF"
-      />
-      <AnimatedRateText
-        style={[styles.cellTextRight, { flex: 1 }]}
-        value={sell}
-        trend={sellTrend}
-        defaultColor="#F0C733"
-      />
+      
+      <View style={{ flex: 0.9, alignItems: 'flex-end', paddingRight: 4 }}>
+        <View style={styles.buyBox}>
+          <AnimatedRateText
+            style={styles.cellPriceText}
+            value={buy}
+            trend={buyTrend}
+            defaultColor="#FFFFFF"
+          />
+        </View>
+      </View>
+      
+      <View style={{ flex: 0.9, alignItems: 'flex-end' }}>
+        <View style={styles.sellBox}>
+          <AnimatedRateText
+            style={styles.cellPriceTextGold}
+            value={sell}
+            trend={sellTrend}
+            defaultColor="#F0C733"
+          />
+        </View>
+      </View>
     </View>
   );
 };
@@ -459,9 +469,9 @@ export default function RatesScreen() {
 
             <View style={styles.tableContainer}>
               <View style={styles.tableHeaderRow}>
-                <Text style={[styles.headerTextLeft, { flex: 1.4 }]}>PRODUCT</Text>
-                <Text style={[styles.headerTextRight, { flex: 1 }]}>BUY</Text>
-                <Text style={[styles.headerTextRight, { flex: 1 }]}>SELL</Text>
+                <Text style={[styles.headerTextLeft, { flex: 1.8 }]}>PRODUCT</Text>
+                <Text style={[styles.headerTextRight, { flex: 0.9, paddingRight: 4 }]}>BUY</Text>
+                <Text style={[styles.headerTextRight, { flex: 0.9 }]}>SELL</Text>
               </View>
 
               <View style={styles.tableBody}>
@@ -710,6 +720,40 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     letterSpacing: 0.25,
     textAlign: 'right',
+  },
+  buyBox: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 8,
+    paddingVertical: 12,      // Substantial padding for increased box size
+    paddingHorizontal: 16,    // Substantial padding for increased box size
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    minWidth: 92,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sellBox: {
+    backgroundColor: 'rgba(240, 199, 51, 0.12)', // Premium frosted gold container
+    borderRadius: 8,
+    paddingVertical: 12,      // Substantial padding for increased box size
+    paddingHorizontal: 16,    // Substantial padding for increased box size
+    borderWidth: 1,
+    borderColor: 'rgba(240, 199, 51, 0.3)',
+    minWidth: 92,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cellPriceText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.25,
+  },
+  cellPriceTextGold: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#F0C733',
+    letterSpacing: 0.25,
   },
   musicButtonWrap: {
     width: '100%',
