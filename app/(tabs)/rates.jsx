@@ -47,12 +47,76 @@ const AnimatedRateText = ({ value, trend, style, defaultColor = RATE_DEFAULT_TEX
   return <Animated.Text style={[style, { color }]}>{value}</Animated.Text>;
 };
 
-const RetailRow = ({ purity, rate10g, trend, isLast = false, defaultColor = RATE_DEFAULT_TEXT_COLOR }) => (
-  <View style={[styles.retailRow, isLast && { borderBottomWidth: 0 }]}>
-    <Text style={[styles.retailColText, { flex: 1, textAlign: 'left', paddingLeft: 10 }]}>{purity}</Text>
-    <AnimatedRateText style={[styles.retailColRate, { flex: 1, textAlign: 'right', paddingRight: 10 }]} value={rate10g} trend={trend} defaultColor={defaultColor} />
-  </View>
-);
+const parseProductName = (productName) => {
+  const match = productName.match(/^(.*?)\s*\((.*?)\)$/);
+  if (match) {
+    return { name: match[1], sub: match[2] };
+  }
+  return { name: productName, sub: '' };
+};
+
+const LocalRateRow = ({ product, buy, sell, buyTrend, sellTrend, isLast = false }) => {
+  const { name, sub } = parseProductName(product);
+  const isGold = name.toLowerCase().includes('gold');
+  const dotColor = isGold ? '#FFD700' : '#E5E7EB'; 
+
+  return (
+    <View style={[styles.rowContainer, isLast && { borderBottomWidth: 0 }]}>
+      <View style={{ flex: 1.4, flexDirection: 'row', alignItems: 'center' }}>
+        <View style={[styles.productIndicator, { backgroundColor: dotColor }]} />
+        <View style={{ flexDirection: 'column' }}>
+          <Text style={styles.cellTextLeftName}>{name}</Text>
+          {sub ? <Text style={styles.cellTextLeftSub}>{sub}</Text> : null}
+        </View>
+      </View>
+      <AnimatedRateText
+        style={[styles.cellTextRight, { flex: 1 }]}
+        value={buy}
+        trend={buyTrend}
+        defaultColor="#FFFFFF"
+      />
+      <AnimatedRateText
+        style={[styles.cellTextRight, { flex: 1 }]}
+        value={sell}
+        trend={sellTrend}
+        defaultColor="#F0C733"
+      />
+    </View>
+  );
+};
+
+const SpotRateRow = ({ symbol, buy, sell, high, low, buyTrend, sellTrend, isLast = false }) => {
+  const { name, sub } = parseProductName(symbol);
+  const isGold = name.toLowerCase().includes('gold');
+  const isUSD = name.toLowerCase().includes('usd');
+  const dotColor = isGold ? '#FFD700' : isUSD ? '#3B82F6' : '#E5E7EB'; 
+
+  return (
+    <View style={[styles.rowContainer, isLast && { borderBottomWidth: 0 }]}>
+      <View style={{ flex: 1.2, flexDirection: 'row', alignItems: 'center' }}>
+        <View style={[styles.productIndicator, { backgroundColor: dotColor }]} />
+        <View style={{ flexDirection: 'column' }}>
+          <Text style={styles.cellTextLeftName}>{name}</Text>
+          {sub ? <Text style={styles.cellTextLeftSub}>{sub}</Text> : null}
+        </View>
+      </View>
+      <AnimatedRateText
+        style={[styles.cellTextRight, { flex: 1 }]}
+        value={buy}
+        trend={buyTrend}
+        defaultColor="#FFFFFF"
+      />
+      <AnimatedRateText
+        style={[styles.cellTextRight, { flex: 1 }]}
+        value={sell}
+        trend={sellTrend}
+        defaultColor="#F0C733"
+      />
+      <Text style={[styles.cellTextRight, { flex: 1, color: '#10B981', fontSize: 13, fontWeight: '600' }]}>{high}</Text>
+      <Text style={[styles.cellTextRight, { flex: 1, color: '#EF4444', fontSize: 13, fontWeight: '600' }]}>{low}</Text>
+    </View>
+  );
+};
 
 export default function RatesScreen() {
   const scrollX = useRef(new Animated.Value(0)).current;
@@ -142,48 +206,49 @@ export default function RatesScreen() {
   // karatBase = Math.round(live999Sell * factor)
   // sell (10g) = karatBase or Math.round(karatBase + ratesPage.gold) when showModified
   // sell8g = Math.round(sell * 0.8) — offset applies only via 10g sell, not added again on 8g
-  const calculateKaratValue = (baseAsk, karatFactor, grams = 10) => {
-    if (!baseAsk || baseAsk === '-') return '--';
-    const live999Sell = parseFloat(baseAsk);
-    if (isNaN(live999Sell) || live999Sell === 0) return '--';
+  const calculateKaratRate = (baseRateVal, karatFactor, grams = 10, isBuy = false) => {
+    if (!baseRateVal || baseRateVal === '-') return '--';
+    const liveVal = parseFloat(String(baseRateVal).replace(/,/g, ''));
+    if (isNaN(liveVal) || liveVal === 0) return '--';
 
     const mods = settings.ratesPageModifications;
-    const karatBase = Math.round(live999Sell * karatFactor);
+    const karatBase = Math.round(liveVal * karatFactor);
 
-    let sell10 = karatBase;
+    let finalVal = karatBase;
     if (mods?.isModifiedMode) {
       const sDelta = Number(mods.gold999) || 0;
-      sell10 = Math.round(karatBase + sDelta);
+      finalVal = Math.round(karatBase + sDelta);
     }
 
-    return grams === 8 ? Math.round(sell10 * 0.8) : grams === 10 ? sell10 : Math.round((live999Sell / 10) * karatFactor * grams);
+    const numericVal = grams === 8 
+      ? Math.round(finalVal * 0.8) 
+      : grams === 10 
+      ? finalVal 
+      : Math.round((liveVal / 10) * karatFactor * grams);
+
+    return '\u20B9' + numericVal.toLocaleString('en-IN');
   };
 
-  const calculateKaratRate = (baseAsk, karatFactor, grams = 10) => {
-    const value = calculateKaratValue(baseAsk, karatFactor, grams);
-    if (value === '--') return '--';
-    return '\u20B9' + Number(value).toLocaleString('en-IN');
-  };
-
-  const getSilverRate = () => {
-    const silver = currentRates['2987']?.ask; // Silver 999 5KG as base
+  const getSilverRateValue = (isBuy = false) => {
+    const silver = isBuy ? currentRates['2987']?.bid : currentRates['2987']?.ask; // Silver 999 5KG as base
     if (!silver || silver === '-') return '--';
-    let perKg = parseFloat(silver);
-    if (isNaN(perKg)) return '--';
-
-    const applyOffset = (base, offsetVal) => {
-      if (offsetVal === undefined || offsetVal === null) return base;
-      const v = Number(offsetVal);
-      if (isNaN(v)) return base;
-      return base + v;
-    };
+    let val = parseFloat(String(silver).replace(/,/g, ''));
+    if (isNaN(val)) return '--';
 
     const mods = settings.ratesPageModifications;
-
-    if (mods?.isModifiedMode) {
-      perKg = applyOffset(perKg, mods.silver999);
+    if (mods?.isModifiedMode && mods.silver999) {
+      val += Number(mods.silver999);
     }
-    return perKg.toLocaleString('en-IN');
+    return '\u20B9' + Math.round(val).toLocaleString('en-IN');
+  };
+
+  const formatSpotRate = (val, isINR = false) => {
+    if (!val || val === '-') return '--';
+    const num = parseFloat(String(val).replace(/,/g, ''));
+    if (isNaN(num)) return val;
+    return isINR
+      ? '₹' + num.toFixed(2)
+      : '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
   useEffect(() => {
@@ -390,89 +455,102 @@ export default function RatesScreen() {
           </View>
 
           <View style={styles.tableSection}>
-            <Text style={styles.tableTitleText}>LIVE RETAIL RATES WITH GST</Text>
+            <Text style={styles.tableTitleText}>LOCAL RETAIL RATES (WITH GST)</Text>
 
             <View style={styles.tableContainer}>
               <View style={styles.tableHeaderRow}>
-                <Text style={[styles.headerText, { flex: 1, textAlign: 'left', paddingLeft: 10 }]}>PURITY</Text>
-                <Text style={[styles.headerText, { flex: 1, textAlign: 'right', paddingRight: 10 }]}>10 GRAMS</Text>
+                <Text style={[styles.headerTextLeft, { flex: 1.4 }]}>PRODUCT</Text>
+                <Text style={[styles.headerTextRight, { flex: 1 }]}>BUY</Text>
+                <Text style={[styles.headerTextRight, { flex: 1 }]}>SELL</Text>
               </View>
 
               <View style={styles.tableBody}>
-                <RetailRow
-                  purity="Gold 24 KT"
-                  rate10g={calculateKaratRate(currentRates['945']?.ask, 1.0, 10)}
-                  trend={getRateChangeType('945')}
+                <LocalRateRow
+                  product="Gold 999 (10 Grams)"
+                  buy={calculateKaratRate(currentRates['945']?.bid, 1.0, 10, true)}
+                  sell={calculateKaratRate(currentRates['945']?.ask, 1.0, 10, false)}
+                  buyTrend={getRateChangeType('945')}
+                  sellTrend={getRateChangeType('945')}
                 />
-                <RetailRow
-                  purity="Gold 22 KT"
-                  rate10g={calculateKaratRate(currentRates['945']?.ask, 0.916, 10)}
-                  trend={getRateChangeType('945')}
+                <LocalRateRow
+                  product="Gold 916 (10 Grams)"
+                  buy={calculateKaratRate(currentRates['945']?.bid, 0.916, 10, true)}
+                  sell={calculateKaratRate(currentRates['945']?.ask, 0.916, 10, false)}
+                  buyTrend={getRateChangeType('945')}
+                  sellTrend={getRateChangeType('945')}
                 />
-                <RetailRow
-                  purity="Gold 18 KT"
-                  rate10g={calculateKaratRate(currentRates['945']?.ask, 0.75, 10)}
-                  trend={getRateChangeType('945')}
+                <LocalRateRow
+                  product="Gold 750 (10 Grams)"
+                  buy={calculateKaratRate(currentRates['945']?.bid, 0.75, 10, true)}
+                  sell={calculateKaratRate(currentRates['945']?.ask, 0.75, 10, false)}
+                  buyTrend={getRateChangeType('945')}
+                  sellTrend={getRateChangeType('945')}
                 />
-                <RetailRow
-                  purity="Gold 14 KT"
-                  rate10g={calculateKaratRate(currentRates['945']?.ask, 0.583, 10)}
-                  trend={getRateChangeType('945')}
+                <LocalRateRow
+                  product="Gold 583 (10 Grams)"
+                  buy={calculateKaratRate(currentRates['945']?.bid, 0.583, 10, true)}
+                  sell={calculateKaratRate(currentRates['945']?.ask, 0.583, 10, false)}
+                  buyTrend={getRateChangeType('945')}
+                  sellTrend={getRateChangeType('945')}
+                />
+                <LocalRateRow
+                  product="Gold 916 (8 Grams) - Kasu"
+                  buy={calculateKaratRate(currentRates['945']?.bid, 0.916, 8, true)}
+                  sell={calculateKaratRate(currentRates['945']?.ask, 0.916, 8, false)}
+                  buyTrend={getRateChangeType('945')}
+                  sellTrend={getRateChangeType('945')}
+                />
+                <LocalRateRow
+                  product="Silver 999 (1 KG)"
+                  buy={getSilverRateValue(true)}
+                  sell={getSilverRateValue(false)}
+                  buyTrend={getRateChangeType('2987')}
+                  sellTrend={getRateChangeType('2987')}
                   isLast
                 />
               </View>
             </View>
 
-            <View style={styles.subTableContainer}>
+            <Text style={[styles.tableTitleText, { marginTop: 22 }]}>LIVE SPOT RATES (INTERNATIONAL)</Text>
+
+            <View style={styles.tableContainer}>
               <View style={styles.tableHeaderRow}>
-                <Text style={[styles.headerText, { flex: 1, textAlign: 'left', paddingLeft: 10 }]}>NAVARSU / KASU</Text>
-                <Text style={[styles.headerText, { flex: 1, textAlign: 'right', paddingRight: 10 }]}>8 GRAMS</Text>
-              </View>
-
-
-              <View style={styles.tableBody}>
-                <View style={[styles.retailRow, { borderBottomWidth: 0 }]}>
-                  <Text style={[styles.retailColText, { flex: 1, textAlign: 'left', paddingLeft: 10 }]}>Gold 22KT</Text>
-                  <AnimatedRateText
-                    style={[styles.retailColRate, { flex: 1, textAlign: 'right', paddingRight: 10 }]}
-                    value={calculateKaratRate(currentRates['945']?.ask, 0.916, 8)}
-                    trend={getRateChangeType('945')}
-                  />
-                </View>
-              </View>
-            </View>
-
-            {/* Silver Table */}
-            <View style={styles.subTableContainer}>
-              <View style={styles.tableHeaderRow}>
-                <Text style={[styles.headerText, { flex: 1, textAlign: 'left', paddingLeft: 10 }]}>SILVER</Text>
-                <Text style={[styles.headerText, { flex: 1, textAlign: 'right', paddingRight: 10 }]}>10 GRAMS</Text>
+                <Text style={[styles.headerTextLeft, { flex: 1.2 }]}>SYMBOL</Text>
+                <Text style={[styles.headerTextRight, { flex: 1 }]}>BUY</Text>
+                <Text style={[styles.headerTextRight, { flex: 1 }]}>SELL</Text>
+                <Text style={[styles.headerTextRight, { flex: 1, color: '#10B981' }]}>HIGH</Text>
+                <Text style={[styles.headerTextRight, { flex: 1, color: '#EF4444' }]}>LOW</Text>
               </View>
 
               <View style={styles.tableBody}>
-                <View style={[styles.retailRow, { borderBottomWidth: 0 }]}>
-                  <Text style={[styles.retailColText, { flex: 1, textAlign: 'left', paddingLeft: 10 }]}>Silver 999</Text>
-                  <AnimatedRateText
-                    style={[styles.retailColRate, { flex: 1, textAlign: 'right', paddingRight: 10 }]}
-                    value={(() => {
-                        const silver = currentRates['2987']?.ask; // Base KG
-                        if (!silver || silver === '-') return '--';
-                        let val = parseFloat(silver.replace(/,/g, ''));
-                        if (isNaN(val)) return '--';
-                        
-                        // Apply mods if needed (similar to getSilverRate)
-                        const mods = settings.ratesPageModifications;
-                        if (mods?.isModifiedMode && mods.silver999) {
-                            val += Number(mods.silver999);
-                        }
-                        
-                        const per10g = Math.round(val / 100);
-                        return '\u20B9' + per10g.toLocaleString('en-IN');
-                    })()}
-                    trend={getRateChangeType('2987')}
-                    defaultColor="#CFE9E1"
-                  />
-                </View>
+                <SpotRateRow
+                  symbol="GOLD ($ / oz)"
+                  buy={formatSpotRate(currentRates['3101']?.bid, false)}
+                  sell={formatSpotRate(currentRates['3101']?.ask, false)}
+                  high={formatSpotRate(currentRates['3101']?.high, false)}
+                  low={formatSpotRate(currentRates['3101']?.low, false)}
+                  buyTrend={getRateChangeType('3101')}
+                  sellTrend={getRateChangeType('3101')}
+                />
+                <SpotRateRow
+                  symbol="SILVER ($ / oz)"
+                  buy={formatSpotRate(currentRates['3107']?.bid, false)}
+                  sell={formatSpotRate(currentRates['3107']?.ask, false)}
+                  high={formatSpotRate(currentRates['3107']?.high, false)}
+                  low={formatSpotRate(currentRates['3107']?.low, false)}
+                  buyTrend={getRateChangeType('3107')}
+                  sellTrend={getRateChangeType('3107')}
+                />
+                <SpotRateRow
+                  symbol="USD - INR (₹)"
+                  buy={formatSpotRate(currentRates['3103']?.bid, true)}
+                  sell={formatSpotRate(currentRates['3103']?.ask, true)}
+                  high={formatSpotRate(currentRates['3103']?.high, true)}
+                  low={formatSpotRate(currentRates['3103']?.low, true)}
+                  buyTrend={getRateChangeType('3103')}
+                  sellTrend={getRateChangeType('3103')}
+                  isLast
+                />
               </View>
             </View>
 
@@ -540,63 +618,98 @@ const styles = StyleSheet.create({
   },
   tableSection: {
     width: '100%',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     marginTop: 25,
   },
   tableTitleText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '900',
-    color: '#FFF',
-    letterSpacing: 1,
+    color: '#D4AF37', // Elegant premium gold title
+    letterSpacing: 1.5,
     textAlign: 'center',
-    marginBottom: 15,
+    marginBottom: 12,
+    textTransform: 'uppercase',
   },
   tableContainer: {
-    backgroundColor: 'rgba(0, 0, 0, 0.15)',
-    borderRadius: 15,
+    backgroundColor: 'rgba(12, 6, 22, 0.96)', // Solid ultra-dark violet for premium readability
+    borderRadius: 14,
+    borderWidth: 1.2,
+    borderColor: 'rgba(212, 175, 55, 0.35)', // Clean, fine gold accent border
     overflow: 'hidden',
-  },
-  subTableContainer: {
-    backgroundColor: 'rgba(0, 0, 0, 0.15)',
-    borderRadius: 15,
-    overflow: 'hidden',
-    marginTop: 18,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 10,
   },
   tableHeaderRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    backgroundColor: '#A0155B',
+    alignItems: 'center',
+    backgroundColor: 'rgba(8, 4, 15, 0.98)', // Polished deepest black-violet
     paddingVertical: 12,
-    paddingHorizontal: 15,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1.2,
+    borderBottomColor: 'rgba(212, 175, 55, 0.45)', // Slightly brighter clean gold division line
   },
-  headerText: {
+  headerTextLeft: {
     fontSize: 12,
-    fontWeight: 'bold',
-    color: '#FFF',
+    fontWeight: '800',
+    color: '#D4AF37', // Elegant premium gold for headings
     letterSpacing: 1,
+    textAlign: 'left',
+    textTransform: 'uppercase',
+  },
+  headerTextRight: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#D4AF37', // Elegant premium gold for headings
+    letterSpacing: 1,
+    textAlign: 'right',
+    textTransform: 'uppercase',
   },
   tableBody: {
-    paddingHorizontal: 15,
-    paddingBottom: 5,
+    paddingHorizontal: 16,
+    paddingBottom: 4,
   },
-  retailRow: {
+  rowContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 18,
+    paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.05)',
   },
-  retailColText: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#FFF',
+  productIndicator: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 10,
   },
-  retailColRate: {
+  cellTextLeft: {
     fontSize: 14,
-    fontWeight: '900',
-    color: '#F0C733', 
-    letterSpacing: 0.5,
+    fontWeight: '700',
+    color: '#F3F4F6',
+    letterSpacing: 0.2,
+    textAlign: 'left',
+  },
+  cellTextLeftName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FFFFFF', // High-contrast clean white
+    letterSpacing: 0.25,
+  },
+  cellTextLeftSub: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#9CA3AF', // Clean muted weight label
+    marginTop: 2.5,
+  },
+  cellTextRight: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.25,
+    textAlign: 'right',
   },
   musicButtonWrap: {
     width: '100%',
