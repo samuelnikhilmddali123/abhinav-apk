@@ -134,12 +134,12 @@ const injectedJS = `
         el.style.setProperty('font-family', '-apple-system, sans-serif', 'important');
         el.style.setProperty('font-weight', '900', 'important');
         el.style.setProperty('letter-spacing', '1px', 'important');
-        el.style.setProperty('font-size', '10px', 'important');
-        el.style.setProperty('border-radius', '20px', 'important');
-        el.style.setProperty('background-color', '#E2E8F0', 'important'); // Polished light slate gray
-        el.style.setProperty('color', '#1E293B', 'important'); // Slate dark text
-        el.style.setProperty('border', '1px solid #CBD5E1', 'important');
-        el.style.setProperty('padding', '4px 12px', 'important');
+        el.style.setProperty('font-size', '11px', 'important');
+        el.style.setProperty('border-radius', '4px', 'important');
+        el.style.setProperty('background-color', 'transparent', 'important');
+        el.style.setProperty('color', '#9A155B', 'important');
+        el.style.setProperty('border', 'none', 'important');
+        el.style.setProperty('padding', '2px 6px', 'important');
         el.style.setProperty('text-transform', 'uppercase', 'important');
       }
     });
@@ -148,16 +148,30 @@ const injectedJS = `
     const sections = document.querySelectorAll('div, section');
     sections.forEach(section => {
       if (section.innerText && section.innerText.includes('LOCAL GOLD AND SILVER RETAIL RATES')) {
-        // Find and hide any headers or cells related to HI-LO or high/low inside this container
-        const items = section.querySelectorAll('*');
-        items.forEach(item => {
-          const itemText = item.innerText ? item.innerText.trim().toUpperCase() : '';
+        // Find grid rows (including header) inside this container
+        const rows = section.querySelectorAll('.grid, tr, div[class*="flex-row"], div.flex');
+        rows.forEach(row => {
+          const cols = Array.from(row.children);
           
-          // Hide "HI-LO" pill or texts containing H: / L: / HIGH / LOW
-          if (itemText === 'HI-LO' || itemText.includes('H:') || itemText.includes('L:') || itemText.includes('HIGH') || itemText.includes('LOW')) {
-            if (!itemText.includes('LOCAL GOLD') && !itemText.includes('RETAIL RATES')) {
-              item.style.setProperty('display', 'none', 'important');
+          // If this row has 4 columns (Product, Buy, Sell, Hi-Lo)
+          if (cols.length === 4) {
+            // Hide the 4th column (HI-LO / High-Low values)
+            cols[3].style.setProperty('display', 'none', 'important');
+            
+            // Adjust Tailwind grid columns from 4 to 3
+            if (row.className.includes('grid-cols-4')) {
+              row.classList.remove('grid-cols-4');
+              row.classList.add('grid-cols-3');
             }
+            row.style.setProperty('grid-template-columns', '1.4fr 1fr 1fr', 'important');
+          } else if (cols.length > 4) {
+            // Backup fallback for grids with extra elements
+            cols.forEach(col => {
+              const colText = col.innerText ? col.innerText.trim().toUpperCase() : '';
+              if (colText === 'HI-LO' || colText.includes('H:') || colText.includes('L:')) {
+                col.style.setProperty('display', 'none', 'important');
+              }
+            });
           }
         });
       }
