@@ -79,7 +79,7 @@ const injectedJS = `
 
   // Inject Custom Premium styling for Website inside WebView
   const style = document.createElement('style');
-  style.innerHTML = `
+  style.innerHTML = \`
     /* Force extremely clean professional global font */
     * {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
@@ -121,7 +121,7 @@ const injectedJS = `
       border: 1px solid rgba(212, 175, 55, 0.25) !important;
       box-shadow: 0 6px 12px rgba(0,0,0,0.1) !important;
     }
-  `;
+  \`;
   document.head.appendChild(style);
 
   // Dynamic JS layout modifications
