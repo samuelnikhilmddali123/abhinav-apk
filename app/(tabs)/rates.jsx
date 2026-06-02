@@ -256,9 +256,13 @@ export default function RatesScreen() {
     if (!val || val === '-') return '--';
     const num = parseFloat(String(val).replace(/,/g, ''));
     if (isNaN(num)) return val;
-    return isINR
-      ? '₹' + num.toFixed(2)
-      : '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    if (isINR) {
+      if (num > 1000) {
+        return '₹' + Math.round(num).toLocaleString('en-IN');
+      }
+      return '₹' + num.toFixed(2);
+    }
+    return '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
 
   useEffect(() => {
@@ -521,7 +525,7 @@ export default function RatesScreen() {
               </View>
             </View>
 
-            <Text style={[styles.tableTitleText, { marginTop: 22 }]}>LIVE SPOT RATES (INTERNATIONAL)</Text>
+            <Text style={[styles.tableTitleText, { marginTop: 22 }]}>LIVE SPOT RATES</Text>
 
             <View style={styles.tableContainer}>
               <View style={styles.tableHeaderRow}>
@@ -559,6 +563,24 @@ export default function RatesScreen() {
                   low={formatSpotRate(currentRates['3103']?.low, true)}
                   buyTrend={getRateChangeType('3103')}
                   sellTrend={getRateChangeType('3103')}
+                />
+                <SpotRateRow
+                  symbol="Gold 999 (100 Grams)"
+                  buy={formatSpotRate(currentRates['945']?.bid, true)}
+                  sell={formatSpotRate(currentRates['945']?.ask, true)}
+                  high={formatSpotRate(currentRates['945']?.high, true)}
+                  low={formatSpotRate(currentRates['945']?.low, true)}
+                  buyTrend={getRateChangeType('945')}
+                  sellTrend={getRateChangeType('945')}
+                />
+                <SpotRateRow
+                  symbol="Silver 999 (30 KGS)"
+                  buy={formatSpotRate(currentRates['2966']?.bid, true)}
+                  sell={formatSpotRate(currentRates['2966']?.ask, true)}
+                  high={formatSpotRate(currentRates['2966']?.high, true)}
+                  low={formatSpotRate(currentRates['2966']?.low, true)}
+                  buyTrend={getRateChangeType('2966')}
+                  sellTrend={getRateChangeType('2966')}
                   isLast
                 />
               </View>
