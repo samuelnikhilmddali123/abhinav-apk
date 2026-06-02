@@ -527,64 +527,66 @@ export default function RatesScreen() {
 
             <Text style={[styles.tableTitleText, { marginTop: 22 }]}>LIVE SPOT RATES</Text>
 
-            <View style={styles.tableContainer}>
-              <View style={styles.tableHeaderRow}>
-                <Text style={[styles.headerTextLeft, { flex: 1.2 }]}>SYMBOL</Text>
-                <Text style={[styles.headerTextRight, { flex: 1 }]}>BUY</Text>
-                <Text style={[styles.headerTextRight, { flex: 1 }]}>SELL</Text>
-                <Text style={[styles.headerTextRight, { flex: 1, color: '#10B981' }]}>HIGH</Text>
-                <Text style={[styles.headerTextRight, { flex: 1, color: '#EF4444' }]}>LOW</Text>
-              </View>
+            <ScrollView horizontal={true} showsHorizontalScrollIndicator={false} style={{ width: '100%' }}>
+              <View style={[styles.tableContainer, { minWidth: 500, marginBottom: 10 }]}>
+                <View style={styles.tableHeaderRow}>
+                  <Text style={[styles.headerTextLeft, { flex: 1.2 }]}>SYMBOL</Text>
+                  <Text style={[styles.headerTextRight, { flex: 1 }]}>BUY</Text>
+                  <Text style={[styles.headerTextRight, { flex: 1 }]}>SELL</Text>
+                  <Text style={[styles.headerTextRight, { flex: 1, color: '#10B981' }]}>HIGH</Text>
+                  <Text style={[styles.headerTextRight, { flex: 1, color: '#EF4444' }]}>LOW</Text>
+                </View>
 
-              <View style={styles.tableBody}>
-                <SpotRateRow
-                  symbol="GOLD ($ / oz)"
-                  buy={formatSpotRate(currentRates['3101']?.bid, false)}
-                  sell={formatSpotRate(currentRates['3101']?.ask, false)}
-                  high={formatSpotRate(currentRates['3101']?.high, false)}
-                  low={formatSpotRate(currentRates['3101']?.low, false)}
-                  buyTrend={getRateChangeType('3101')}
-                  sellTrend={getRateChangeType('3101')}
-                />
-                <SpotRateRow
-                  symbol="SILVER ($ / oz)"
-                  buy={formatSpotRate(currentRates['3107']?.bid, false)}
-                  sell={formatSpotRate(currentRates['3107']?.ask, false)}
-                  high={formatSpotRate(currentRates['3107']?.high, false)}
-                  low={formatSpotRate(currentRates['3107']?.low, false)}
-                  buyTrend={getRateChangeType('3107')}
-                  sellTrend={getRateChangeType('3107')}
-                />
-                <SpotRateRow
-                  symbol="USD - INR (₹)"
-                  buy={formatSpotRate(currentRates['3103']?.bid, true)}
-                  sell={formatSpotRate(currentRates['3103']?.ask, true)}
-                  high={formatSpotRate(currentRates['3103']?.high, true)}
-                  low={formatSpotRate(currentRates['3103']?.low, true)}
-                  buyTrend={getRateChangeType('3103')}
-                  sellTrend={getRateChangeType('3103')}
-                />
-                <SpotRateRow
-                  symbol="Gold 999 (100 Grams)"
-                  buy={formatSpotRate(currentRates['945']?.bid, true)}
-                  sell={formatSpotRate(currentRates['945']?.ask, true)}
-                  high={formatSpotRate(currentRates['945']?.high, true)}
-                  low={formatSpotRate(currentRates['945']?.low, true)}
-                  buyTrend={getRateChangeType('945')}
-                  sellTrend={getRateChangeType('945')}
-                />
-                <SpotRateRow
-                  symbol="Silver 999 (30 KGS)"
-                  buy={formatSpotRate(currentRates['2966']?.bid, true)}
-                  sell={formatSpotRate(currentRates['2966']?.ask, true)}
-                  high={formatSpotRate(currentRates['2966']?.high, true)}
-                  low={formatSpotRate(currentRates['2966']?.low, true)}
-                  buyTrend={getRateChangeType('2966')}
-                  sellTrend={getRateChangeType('2966')}
-                  isLast
-                />
+                <View style={styles.tableBody}>
+                  <SpotRateRow
+                    symbol="GOLD ($ / oz)"
+                    buy={formatSpotRate(currentRates['3101']?.bid, false)}
+                    sell={formatSpotRate(currentRates['3101']?.ask, false)}
+                    high={formatSpotRate(currentRates['3101']?.high, false)}
+                    low={formatSpotRate(currentRates['3101']?.low, false)}
+                    buyTrend={getRateChangeType('3101')}
+                    sellTrend={getRateChangeType('3101')}
+                  />
+                  <SpotRateRow
+                    symbol="SILVER ($ / oz)"
+                    buy={formatSpotRate(currentRates['3107']?.bid, false)}
+                    sell={formatSpotRate(currentRates['3107']?.ask, false)}
+                    high={formatSpotRate(currentRates['3107']?.high, false)}
+                    low={formatSpotRate(currentRates['3107']?.low, false)}
+                    buyTrend={getRateChangeType('3107')}
+                    sellTrend={getRateChangeType('3107')}
+                  />
+                  <SpotRateRow
+                    symbol="USD - INR (₹)"
+                    buy={formatSpotRate(currentRates['3103']?.bid, true)}
+                    sell={formatSpotRate(currentRates['3103']?.ask, true)}
+                    high={formatSpotRate(currentRates['3103']?.high, true)}
+                    low={formatSpotRate(currentRates['3103']?.low, true)}
+                    buyTrend={getRateChangeType('3103')}
+                    sellTrend={getRateChangeType('3103')}
+                  />
+                  <SpotRateRow
+                    symbol="Gold 999 (100 Grams)"
+                    buy={formatSpotRate(currentRates['945']?.bid, true)}
+                    sell={formatSpotRate(currentRates['945']?.ask, true)}
+                    high={formatSpotRate(currentRates['945']?.high, true)}
+                    low={formatSpotRate(currentRates['945']?.low, true)}
+                    buyTrend={getRateChangeType('945')}
+                    sellTrend={getRateChangeType('945')}
+                  />
+                  <SpotRateRow
+                    symbol="Silver 999 (30 KGS)"
+                    buy={formatSpotRate(currentRates['2966']?.bid, true)}
+                    sell={formatSpotRate(currentRates['2966']?.ask, true)}
+                    high={formatSpotRate(currentRates['2966']?.high, true)}
+                    low={formatSpotRate(currentRates['2966']?.low, true)}
+                    buyTrend={getRateChangeType('2966')}
+                    sellTrend={getRateChangeType('2966')}
+                    isLast
+                  />
+                </View>
               </View>
-            </View>
+            </ScrollView>
 
             <View style={styles.musicButtonWrap}>
               <TouchableOpacity
