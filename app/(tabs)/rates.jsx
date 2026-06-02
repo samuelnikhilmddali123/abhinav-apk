@@ -217,6 +217,12 @@ export default function RatesScreen() {
   // sell (10g) = karatBase or Math.round(karatBase + ratesPage.gold) when showModified
   // sell8g = Math.round(sell * 0.8) — offset applies only via 10g sell, not added again on 8g
   const calculateKaratRate = (baseRateVal, karatFactor, grams = 10, isBuy = false) => {
+    if (settings.marketStatus?.isStoppedAll) return '--';
+    const goldBuyStopped = settings.rateModifications?.gold999_buy_stopped;
+    const goldSellStopped = settings.rateModifications?.gold999_sell_stopped;
+    if (isBuy && goldBuyStopped) return '--';
+    if (!isBuy && goldSellStopped) return '--';
+
     if (!baseRateVal || baseRateVal === '-') return '--';
     const liveVal = parseFloat(String(baseRateVal).replace(/,/g, ''));
     if (isNaN(liveVal) || liveVal === 0) return '--';
@@ -240,6 +246,12 @@ export default function RatesScreen() {
   };
 
   const getSilverRateValue = (isBuy = false) => {
+    if (settings.marketStatus?.isStoppedAll) return '--';
+    const silverBuyStopped = settings.rateModifications?.silver999_buy_stopped;
+    const silverSellStopped = settings.rateModifications?.silver999_sell_stopped;
+    if (isBuy && silverBuyStopped) return '--';
+    if (!isBuy && silverSellStopped) return '--';
+
     const silver = isBuy ? currentRates['2987']?.bid : currentRates['2987']?.ask; // Silver 999 5KG as base
     if (!silver || silver === '-') return '--';
     let val = parseFloat(String(silver).replace(/,/g, ''));
@@ -252,7 +264,13 @@ export default function RatesScreen() {
     return '\u20B9' + Math.round(val).toLocaleString('en-IN');
   };
 
-  const formatSpotRate = (val, isINR = false) => {
+  const formatSpotRate = (val, isINR = false, stopKey = null) => {
+    if (settings.marketStatus?.isStoppedAll) return '--';
+    if (stopKey === 'gold_buy' && settings.rateModifications?.gold999_buy_stopped) return '--';
+    if (stopKey === 'gold_sell' && settings.rateModifications?.gold999_sell_stopped) return '--';
+    if (stopKey === 'silver_buy' && settings.rateModifications?.silver999_buy_stopped) return '--';
+    if (stopKey === 'silver_sell' && settings.rateModifications?.silver999_sell_stopped) return '--';
+
     if (!val || val === '-') return '--';
     const num = parseFloat(String(val).replace(/,/g, ''));
     if (isNaN(num)) return val;
@@ -565,21 +583,21 @@ export default function RatesScreen() {
                     buyTrend={getRateChangeType('3103')}
                     sellTrend={getRateChangeType('3103')}
                   />
-                  <SpotRateRow
+                   <SpotRateRow
                     symbol="Gold 999 (100 Grams)"
-                    buy={formatSpotRate(currentRates['945']?.bid, true)}
-                    sell={formatSpotRate(currentRates['945']?.ask, true)}
-                    high={formatSpotRate(currentRates['945']?.high, true)}
-                    low={formatSpotRate(currentRates['945']?.low, true)}
+                    buy={formatSpotRate(currentRates['945']?.bid, true, 'gold_buy')}
+                    sell={formatSpotRate(currentRates['945']?.ask, true, 'gold_sell')}
+                    high={formatSpotRate(currentRates['945']?.high, true, 'gold_sell')}
+                    low={formatSpotRate(currentRates['945']?.low, true, 'gold_sell')}
                     buyTrend={getRateChangeType('945')}
                     sellTrend={getRateChangeType('945')}
                   />
                   <SpotRateRow
                     symbol="Silver 999 (30 KGS)"
-                    buy={formatSpotRate(currentRates['2966']?.bid, true)}
-                    sell={formatSpotRate(currentRates['2966']?.ask, true)}
-                    high={formatSpotRate(currentRates['2966']?.high, true)}
-                    low={formatSpotRate(currentRates['2966']?.low, true)}
+                    buy={formatSpotRate(currentRates['2966']?.bid, true, 'silver_buy')}
+                    sell={formatSpotRate(currentRates['2966']?.ask, true, 'silver_sell')}
+                    high={formatSpotRate(currentRates['2966']?.high, true, 'silver_sell')}
+                    low={formatSpotRate(currentRates['2966']?.low, true, 'silver_sell')}
                     buyTrend={getRateChangeType('2966')}
                     sellTrend={getRateChangeType('2966')}
                     isLast
