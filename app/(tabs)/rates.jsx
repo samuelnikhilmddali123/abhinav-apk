@@ -766,22 +766,22 @@ const styles = StyleSheet.create({
   buyBox: {
     backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderRadius: 8,
-    paddingVertical: 12,      // Substantial padding for increased box size
-    paddingHorizontal: 16,    // Substantial padding for increased box size
+    paddingVertical: 15,      // Increased padding for larger box size
+    paddingHorizontal: 20,    // Increased padding for larger box size
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.12)',
-    minWidth: 92,
+    minWidth: 115,            // Increased minWidth
     alignItems: 'center',
     justifyContent: 'center',
   },
   sellBox: {
     backgroundColor: 'rgba(240, 199, 51, 0.12)', // Premium frosted gold container
     borderRadius: 8,
-    paddingVertical: 12,      // Substantial padding for increased box size
-    paddingHorizontal: 16,    // Substantial padding for increased box size
+    paddingVertical: 15,      // Increased padding for larger box size
+    paddingHorizontal: 20,    // Increased padding for larger box size
     borderWidth: 1,
     borderColor: 'rgba(240, 199, 51, 0.3)',
-    minWidth: 92,
+    minWidth: 115,            // Increased minWidth
     alignItems: 'center',
     justifyContent: 'center',
   },
