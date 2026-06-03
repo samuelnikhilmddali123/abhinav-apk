@@ -122,8 +122,8 @@ const SpotRateRow = ({ symbol, buy, sell, high, low, buyTrend, sellTrend, isLast
         trend={sellTrend}
         defaultColor="#F0C733"
       />
-      <Text style={[styles.cellTextRight, { flex: 1, color: '#10B981', fontSize: 13, fontWeight: '600' }]}>{high}</Text>
-      <Text style={[styles.cellTextRight, { flex: 1, color: '#EF4444', fontSize: 13, fontWeight: '600' }]}>{low}</Text>
+      <Text style={[styles.cellTextRight, { flex: 1, color: RATE_UP_COLOR, fontSize: 13, fontWeight: '700' }]}>{high}</Text>
+      <Text style={[styles.cellTextRight, { flex: 1, color: RATE_DOWN_COLOR, fontSize: 13, fontWeight: '700' }]}>{low}</Text>
     </View>
   );
 };
@@ -551,8 +551,8 @@ export default function RatesScreen() {
                   <Text style={[styles.headerTextLeft, { flex: 1.2 }]}>SYMBOL</Text>
                   <Text style={[styles.headerTextRight, { flex: 1 }]}>BUY</Text>
                   <Text style={[styles.headerTextRight, { flex: 1 }]}>SELL</Text>
-                  <Text style={[styles.headerTextRight, { flex: 1, color: '#10B981' }]}>HIGH</Text>
-                  <Text style={[styles.headerTextRight, { flex: 1, color: '#EF4444' }]}>LOW</Text>
+                  <Text style={[styles.headerTextRight, { flex: 1, color: RATE_UP_COLOR }]}>HIGH</Text>
+                  <Text style={[styles.headerTextRight, { flex: 1, color: RATE_DOWN_COLOR }]}>LOW</Text>
                 </View>
 
                 <View style={styles.tableBody}>
