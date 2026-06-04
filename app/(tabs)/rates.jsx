@@ -57,10 +57,10 @@ const injectedJS = `
       body.style.paddingTop = "1px";
       body.style.paddingBottom = "100px";
     }
-    // Disable zoom
+    // Enable zoom
     const meta = document.createElement('meta');
     meta.name = 'viewport';
-    meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+    meta.content = 'width=device-width, initial-scale=1.0, minimum-scale=0.5, maximum-scale=5.0, user-scalable=yes';
     document.getElementsByTagName('head')[0].appendChild(meta);
   }
   allowLayoutFix();
@@ -167,9 +167,10 @@ export default function RatesScreen() {
             startInLoadingState={true}
             javaScriptEnabled={true}
             domStorageEnabled={true}
-            scalesPageToFit={false}
-            setBuiltInZoomControls={false}
+            scalesPageToFit={true}
+            setBuiltInZoomControls={true}
             setDisplayZoomControls={false}
+            pinchGestureEnabled={true}
           />
         </ScrollView>
         {isLoading && !refreshing && (
