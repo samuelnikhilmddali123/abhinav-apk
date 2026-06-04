@@ -2,7 +2,7 @@
   "expo": {
     "name": "Abhinav Gold and Silver",
     "slug": "jewllery-expo",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/Untitled design (2).png",
     "scheme": "jewelryexpo",
@@ -13,11 +13,16 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.abhinavgoldsilver.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
+      "versionCode": 2,
       "predictiveBackGestureEnabled": false,
-      "package": "abhinav.com",
+      "package": "com.stackvill.abhinavgoldsilver",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/Untitled design (2).png",
         "backgroundColor": "#000000"
