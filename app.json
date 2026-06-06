@@ -3,7 +3,7 @@
     "name": "Abhinav Gold and Silver",
     "slug": "jewllery-expo",
     "version": "1.0.0",
-    "orientation": "portrait",
+    "orientation": "default",
     "icon": "./assets/images/Untitled design (2).png",
     "scheme": "jewelryexpo",
     "userInterfaceStyle": "automatic",
@@ -28,7 +28,8 @@
       "output": "static"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true

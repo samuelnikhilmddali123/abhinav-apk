@@ -59,10 +59,10 @@ const injectedJS = `
       body.style.paddingTop = "1px";
       body.style.paddingBottom = "100px";
     }
-    // Disable zoom
+    // Allow zoom
     const meta = document.createElement('meta');
     meta.name = 'viewport';
-    meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+    meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes';
     document.getElementsByTagName('head')[0].appendChild(meta);
   }
   allowLayoutFix();
@@ -179,8 +179,8 @@ export default function HomeScreen() {
             startInLoadingState={true}
             javaScriptEnabled={true}
             domStorageEnabled={true}
-            scalesPageToFit={false}
-            setBuiltInZoomControls={false}
+            scalesPageToFit={true}
+            setBuiltInZoomControls={true}
             setDisplayZoomControls={false}
           />
         </ScrollView>

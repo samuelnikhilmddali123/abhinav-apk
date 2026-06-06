@@ -1,317 +1,137 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { StyleSheet, TouchableOpacity, Text, View, StatusBar, Image, Dimensions, ImageBackground, Animated, Easing, ScrollView, RefreshControl } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
-import { FontAwesome } from '@expo/vector-icons';
-import { useNetInfo } from '@react-native-community/netinfo';
-import { Audio } from 'expo-av';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { 
+  StyleSheet, 
+  View, 
+  ActivityIndicator, 
+  StatusBar,
+  TouchableOpacity,
+  Text,
+  ScrollView,
+  RefreshControl
+} from 'react-native';
+import { WebView } from 'react-native-webview';
+import * as NetInfo from '@react-native-community/netinfo';
 import * as Haptics from 'expo-haptics';
-import { fetchRatesIdMap } from '../../constants/liveRates';
-import { useSettings } from '../../context/SettingsContext';
-import { API_ENDPOINTS, FILE_ROOT } from '../../constants/Config';
-import { registerTabScreenMusicStop } from '../../constants/tabScreenMusicStop';
+import { WEBSITE_URL } from '../../constants/Config';
 
-const { width } = Dimensions.get('window');
-const HEADER_IMAGE = require('../../assets/images/mobile-rates-header.webp');
-const BG_IMAGE = require('../../assets/images/bg-internal.jpg');
-const TICKER_IMAGE = require('../../assets/images/bg-ticker.webp');
-const TICKER_TEXT = "✦   WELCOME TO ABHINAV GOLD & SILVER - QUALITY PURITY GUARANTEED   ";
-const imageSource = Image.resolveAssetSource(HEADER_IMAGE);
-const ASPECT_RATIO = imageSource.width / imageSource.height;
-const RATE_UP_COLOR = '#4ade80';
-const RATE_DOWN_COLOR = '#f87171';
-const RATE_DEFAULT_TEXT_COLOR = '#F0C733';
+const WEB_URL = WEBSITE_URL + '/rates';
+const GOLD_COLOR = '#FFD700';
 
-const AnimatedRateText = ({ value, trend, style, defaultColor = RATE_DEFAULT_TEXT_COLOR }) => {
-  const progress = useRef(new Animated.Value(1)).current;
-  const prevColorRef = useRef(defaultColor);
+const injectedJS = `
+(function() {
+  function hideNavigation() {
+    const footerSelectors = [
+      'footer', '.footer', '.bottom-nav', '.mobile-nav', 
+      '.navbar-fixed-bottom', '.bottom-menu', '#footer', 
+      '.tab-bar', '.navigation-bar', '.mobile-footer', 'nav', '.nav'
+    ];
+    footerSelectors.forEach(selector => {
+      const elements = document.querySelectorAll(selector);
+      elements.forEach(el => {
+        el.style.setProperty('display', 'none', 'important');
+      });
+    });
 
-  const targetColor =
-    trend === 'increase' ? RATE_UP_COLOR : trend === 'decrease' ? RATE_DOWN_COLOR : defaultColor;
+    const topHeaderSelectors = [
+      '.top-nav-wrapper', 
+      'div.absolute.top-0.w-full.z-50',
+      'div.absolute.top-0',
+      'header'
+    ];
+    topHeaderSelectors.forEach(selector => {
+      const elements = document.querySelectorAll(selector);
+      elements.forEach(el => {
+        if (el.innerText.includes('ABHINAV') || el.querySelector('img[src*="logo"]')) {
+          el.style.setProperty('display', 'none', 'important');
+        }
+      });
+    });
+  }
+  hideNavigation();
+  setInterval(hideNavigation, 1000);
 
-  useEffect(() => {
-    prevColorRef.current = targetColor;
-    progress.setValue(0);
-    Animated.timing(progress, {
-      toValue: 1,
-      duration: 300,
-      useNativeDriver: false,
-    }).start();
-  }, [targetColor, progress]);
+  function allowLayoutFix() {
+    const body = document.body;
+    if (body) {
+      body.style.paddingTop = "1px";
+      body.style.paddingBottom = "100px";
+    }
+    // Allow zoom
+    const meta = document.createElement('meta');
+    meta.name = 'viewport';
+    meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes';
+    document.getElementsByTagName('head')[0].appendChild(meta);
+  }
+  allowLayoutFix();
 
-  const color = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [prevColorRef.current, targetColor],
+  // Scroll Position for logic
+  window.addEventListener('scroll', function() {
+    window.ReactNativeWebView.postMessage(
+      JSON.stringify({
+        type: 'scroll',
+        scrollY: window.scrollY
+      })
+    );
   });
 
-  return <Animated.Text style={[style, { color }]}>{value}</Animated.Text>;
-};
-
-const RetailRow = ({ purity, rate10g, trend, isLast = false, defaultColor = RATE_DEFAULT_TEXT_COLOR }) => (
-  <View style={[styles.retailRow, isLast && { borderBottomWidth: 0 }]}>
-    <Text style={[styles.retailColText, { flex: 1, textAlign: 'left', paddingLeft: 10 }]}>{purity}</Text>
-    <AnimatedRateText style={[styles.retailColRate, { flex: 1, textAlign: 'right', paddingRight: 10 }]} value={rate10g} trend={trend} defaultColor={defaultColor} />
-  </View>
-);
+  // Force black labels for spot bar to ensure readability in app
+  const style = document.createElement('style');
+  style.innerHTML = \`
+    .flex.flex-col.items-center span { color: black !important; }
+    span[class*="text-slate-800"] { color: black !important; }
+    .animate-ticker-rtl span { color: white !important; font-weight: 900 !important; }
+  \`;
+  document.head.appendChild(style);
+})();
+`;
 
 export default function RatesScreen() {
-  const scrollX = useRef(new Animated.Value(0)).current;
-  const { settings } = useSettings();
-   const [refreshing, setRefreshing] = useState(false);
-   const [tickerWidth, setTickerWidth] = useState(0);
-  const [rawRates, setRawRates] = useState({});
-  const [previousRates, setPreviousRates] = useState({});
-  const [currentRates, setCurrentRates] = useState({});
-  const [trends, setTrends] = useState({});
-  const [isMusicOn, setIsMusicOn] = useState(false);
-  const netInfo = useNetInfo();
-  const isConnected = netInfo.isConnected !== false;
+  const webViewRef = useRef(null);
+  const [isConnected, setIsConnected] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [isAtTop, setIsAtTop] = useState(true);
 
   useEffect(() => {
-    if (Object.keys(rawRates).length > 0) {
-      setPreviousRates(currentRates);
-      setCurrentRates(rawRates);
-
-      const now = Date.now();
-      setTrends(prev => {
-        const next = { ...prev };
-        Object.keys(rawRates).forEach(id => {
-          const pStr = currentRates[id]?.ask;
-          const cStr = rawRates[id]?.ask;
-          
-          const parseNum = (v) => {
-            if (v === undefined || v === null || v === '-') return NaN;
-            const s = String(v).replace(/,/g, '');
-            return parseFloat(s);
-          };
-
-          const p = parseNum(pStr);
-          const c = parseNum(cStr);
-
-          if (!isNaN(p) && !isNaN(c)) {
-            // ─── PERFECT UNIFIED TREND LOGIC ───
-            const rNV = parseFloat(c.toFixed(6));
-            const rOV = parseFloat(p.toFixed(6));
-
-            if (Math.abs(rNV - rOV) > 0.0000001) {
-              // PRICE MOVED: Apply color immediately
-              next[id] = {
-                type: rNV > rOV ? 'increase' : 'decrease',
-                expiry: now + 2000
-              };
-            } else if (next[id] && now < next[id].expiry) {
-              // STABILITY PROTECTION: Keep previous color until 2s expiry
-              // No change to next[id]
-            } else {
-              // STABLE: Effectively no movement for >2s
-              delete next[id];
-            }
-          }
-        });
-        return next;
-      });
-    }
-  }, [rawRates]);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const now = Date.now();
-      setTrends(prev => {
-        const next = { ...prev };
-        let changed = false;
-        Object.keys(next).forEach(id => {
-          if (now > next[id].expiry) {
-            delete next[id];
-            changed = true;
-          }
-        });
-        return changed ? next : prev;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
+    const ni = (NetInfo.default || NetInfo);
+    const unsubscribe = ni.addEventListener(state => {
+      setIsConnected(state.isConnected !== false);
+    });
+    return () => unsubscribe();
   }, []);
 
-  const isFetchingRatesRef = useRef(false);
-  const soundRef = useRef(null);
-
-  const getRateChangeType = (id) => {
-    return trends[id]?.type || "same";
-  };
-
-  // Same math as abhanav-website `src/context/RateContext.jsx` → `ratesPagePurities`:
-  // karatBase = Math.round(live999Sell * factor)
-  // sell (10g) = karatBase or Math.round(karatBase + ratesPage.gold) when showModified
-  // sell8g = Math.round(sell * 0.8) — offset applies only via 10g sell, not added again on 8g
-  const calculateKaratValue = (baseAsk, karatFactor, grams = 10) => {
-    if (!baseAsk || baseAsk === '-') return '--';
-    const live999Sell = parseFloat(baseAsk);
-    if (isNaN(live999Sell) || live999Sell === 0) return '--';
-
-    const mods = settings.ratesPageModifications;
-    const karatBase = Math.round(live999Sell * karatFactor);
-
-    let sell10 = karatBase;
-    if (mods?.isModifiedMode) {
-      const sDelta = Number(mods.gold999) || 0;
-      sell10 = Math.round(karatBase + sDelta);
-    }
-
-    return grams === 8 ? Math.round(sell10 * 0.8) : grams === 10 ? sell10 : Math.round((live999Sell / 10) * karatFactor * grams);
-  };
-
-  const calculateKaratRate = (baseAsk, karatFactor, grams = 10) => {
-    const value = calculateKaratValue(baseAsk, karatFactor, grams);
-    if (value === '--') return '--';
-    return '\u20B9' + Number(value).toLocaleString('en-IN');
-  };
-
-  const getSilverRate = () => {
-    const silver = currentRates['2987']?.ask; // Silver 999 5KG as base
-    if (!silver || silver === '-') return '--';
-    let perKg = parseFloat(silver);
-    if (isNaN(perKg)) return '--';
-
-    const applyOffset = (base, offsetVal) => {
-      if (offsetVal === undefined || offsetVal === null) return base;
-      const v = Number(offsetVal);
-      if (isNaN(v)) return base;
-      return base + v;
-    };
-
-    const mods = settings.ratesPageModifications;
-
-    if (mods?.isModifiedMode) {
-      perKg = applyOffset(perKg, mods.silver999);
-    }
-    return perKg.toLocaleString('en-IN');
-  };
-
-  useEffect(() => {
-    const fetchRates = async () => {
-      if (isFetchingRatesRef.current) return;
-      isFetchingRatesRef.current = true;
-      try {
-        const newMap = await fetchRatesIdMap(API_ENDPOINTS.RATES_LIVE);
-        if (newMap && Object.keys(newMap).length > 0) {
-            setRawRates(newMap);
-        }
-      } catch (e) {
-        console.log('Error fetching rates:', e);
-      } finally {
-        isFetchingRatesRef.current = false;
-      }
-    };
-
-    fetchRates();
-    const interval = setInterval(fetchRates, 1000);
-    return () => clearInterval(interval);
-  }, [settings.ratesPageModifications]);
-
-  useEffect(() => {
-    if (tickerWidth > 0) {
-      scrollX.setValue(0);
-      Animated.loop(
-        Animated.timing(scrollX, {
-          toValue: -tickerWidth,
-          duration: tickerWidth * 12,
-          easing: Easing.linear,
-          useNativeDriver: true,
-        })
-      ).start();
-    }
-  }, [tickerWidth, scrollX]);
-
-  // Reset ticker width when text changes
-  useEffect(() => {
-    setTickerWidth(0);
-  }, [settings.ticker]);
-
-  const stopAndResetMusic = React.useCallback(async () => {
-    const snd = soundRef.current;
-    soundRef.current = null;
-    if (snd) {
-      try {
-        await snd.stopAsync();
-      } catch {}
-      try {
-        await snd.unloadAsync();
-      } catch {}
-    }
-    setIsMusicOn(false);
-  }, []);
-
-  const startMusic = React.useCallback(async () => {
+  const onMessage = (event) => {
     try {
-      const musicUrl = settings.music?.ratesMusic?.fileUrl;
-      const source = musicUrl ? { uri: FILE_ROOT + musicUrl } : null;
-      if (!source) {
-        console.log("Rates music URL not found in settings");
-        setIsMusicOn(false);
-        return;
+      const data = JSON.parse(event.nativeEvent.data);
+      if (data.type === "scroll") {
+        setIsAtTop(data.scrollY <= 0);
       }
+    } catch (e) {}
+  };
 
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: false,
-        playsInSilentModeIOS: true,
-        shouldDuckAndroid: true,
-        staysActiveInBackground: false,
-      });
-
-      const { sound } = await Audio.Sound.createAsync(source, {
-        shouldPlay: true,
-        isLooping: true,
-        volume: 1.0,
-      });
-
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (!status.isLoaded && status.error) {
-          console.log('Rates music playback error:', status.error);
-        }
-      });
-
-      soundRef.current = sound;
-      setIsMusicOn(true);
-    } catch (e) {
-      console.log('Rates music start failed:', e);
-      await stopAndResetMusic();
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    if (webViewRef.current) {
+      webViewRef.current.reload();
     }
-  }, [stopAndResetMusic, settings.music]);
-
-  const toggleMusic = React.useCallback(async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (isMusicOn) {
-      await stopAndResetMusic();
-      return;
-    }
-    await startMusic();
-  }, [isMusicOn, stopAndResetMusic, startMusic]);
-
-  useFocusEffect(
-    React.useCallback(() => {
-      return () => {
-        void stopAndResetMusic();
-      };
-    }, [stopAndResetMusic])
-  );
-
-  useEffect(() => {
-    return () => {
-      void stopAndResetMusic();
-    };
-  }, [stopAndResetMusic]);
-
-  useEffect(() => {
-    return registerTabScreenMusicStop(() => stopAndResetMusic());
-  }, [stopAndResetMusic]);
+    // Safety timeout to hide spinner if reload is fast or fails
+    setTimeout(() => setRefreshing(false), 2500);
+  }, []);
 
   if (!isConnected) {
     return (
-      <View style={[styles.container, styles.offlineContainer]}>
-        <StatusBar barStyle="light-content" backgroundColor="#1A0B2E" />
-        <FontAwesome name="wifi" size={64} color="#F0C733" style={{ marginBottom: 20 }} />
+      <View style={styles.offlineContainer}>
+        <StatusBar barStyle="light-content" backgroundColor="#000" />
+        <Text style={{ fontSize: 60, marginBottom: 20 }}>📡</Text>
         <Text style={styles.offlineTitle}>No Internet Connection</Text>
-        <Text style={styles.offlineSubTitle}>Please check your network settings to view live rates.</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={() => {}}>
+        <Text style={styles.offlineSubTitle}>Please check your network settings and try again.</Text>
+        <TouchableOpacity 
+          style={styles.retryButton} 
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            if (webViewRef.current) webViewRef.current.reload();
+          }}
+        >
           <Text style={styles.retryText}>Retry</Text>
         </TouchableOpacity>
       </View>
@@ -320,347 +140,94 @@ export default function RatesScreen() {
 
   return (
     <View style={styles.container}>
-
-      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
-      <ImageBackground source={BG_IMAGE} style={styles.bgImage} resizeMode="cover">
+      <StatusBar barStyle="light-content" backgroundColor="black" />
+      
+      <View style={styles.webViewWrapper}>
         <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          bounces
+          contentContainerStyle={{ flexGrow: 1 }}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={async () => {
-                 setRefreshing(true);
-                 try {
-                   const newMap = await fetchRatesIdMap(API_ENDPOINTS.RATES_LIVE);
-                   if (newMap && Object.keys(newMap).length > 0) {
-                       setRawRates(newMap);
-                   }
-                 } catch (e) {
-                 } finally {
-                   setRefreshing(false);
-                 }
-              }}
-              colors={['#F0C733']}
-              tintColor={'#F0C733'}
+              onRefresh={onRefresh}
+              enabled={isAtTop}
+              colors={[GOLD_COLOR]}
+              tintColor={GOLD_COLOR}
             />
           }
+          scrollEnabled={isAtTop}
         >
-          <Image
-            source={HEADER_IMAGE}
-            style={{
-              width: width,
-              height: 220,
-              resizeMode: 'contain',
-              marginBottom: -15,
-              backgroundColor: 'transparent'
+          <WebView 
+            ref={webViewRef}
+            source={{ uri: WEB_URL }}
+            style={styles.webView}
+            injectedJavaScript={injectedJS}
+            onMessage={onMessage}
+            onLoadStart={() => {
+              setIsLoading(true);
             }}
+            onLoadEnd={() => {
+              setIsLoading(false);
+              setRefreshing(false);
+            }}
+            pullToRefreshEnabled={false}
+            bounces={true}
+            overScrollMode="always"
+            nestedScrollEnabled={true}
+            startInLoadingState={true}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            scalesPageToFit={true}
+            setBuiltInZoomControls={true}
+            setDisplayZoomControls={false}
           />
-
-
-
-
-
-
-
-          <View style={styles.tickerContainer}>
-
-            <ImageBackground 
-              source={TICKER_IMAGE} 
-              style={[styles.tickerImage, { height: 40, width: '120%', justifyContent: 'center', overflow: 'hidden' }]} 
-              resizeMode="cover" 
-            >
-              <Animated.View style={{ flexDirection: 'row', width: 8000, position: 'absolute', left: 0, transform: [{ translateX: scrollX }] }}>
-                <Text 
-                  onLayout={(e) => {
-                    const w = e.nativeEvent.layout.width;
-                    if (tickerWidth === 0 && w > 0) setTickerWidth(w);
-                  }}
-                  style={styles.tickerText}
-                >
-                  {settings.ticker}
-                </Text>
-                {Array.from({ length: 15 }).map((_, i) => (
-                    <Text key={i} style={styles.tickerText}>{settings.ticker}</Text>
-                ))}
-              </Animated.View>
-            </ImageBackground>
-          </View>
-
-          <View style={styles.tableSection}>
-            <Text style={styles.tableTitleText}>LIVE RETAIL RATES WITH GST</Text>
-
-            <View style={styles.tableContainer}>
-              <View style={styles.tableHeaderRow}>
-                <Text style={[styles.headerText, { flex: 1, textAlign: 'left', paddingLeft: 10 }]}>PURITY</Text>
-                <Text style={[styles.headerText, { flex: 1, textAlign: 'right', paddingRight: 10 }]}>10 GRAMS</Text>
-              </View>
-
-              <View style={styles.tableBody}>
-                <RetailRow
-                  purity="Gold 24 KT"
-                  rate10g={calculateKaratRate(currentRates['945']?.ask, 1.0, 10)}
-                  trend={getRateChangeType('945')}
-                />
-                <RetailRow
-                  purity="Gold 22 KT"
-                  rate10g={calculateKaratRate(currentRates['945']?.ask, 0.916, 10)}
-                  trend={getRateChangeType('945')}
-                />
-                <RetailRow
-                  purity="Gold 18 KT"
-                  rate10g={calculateKaratRate(currentRates['945']?.ask, 0.75, 10)}
-                  trend={getRateChangeType('945')}
-                />
-                <RetailRow
-                  purity="Gold 14 KT"
-                  rate10g={calculateKaratRate(currentRates['945']?.ask, 0.583, 10)}
-                  trend={getRateChangeType('945')}
-                  isLast
-                />
-              </View>
-            </View>
-
-            <View style={styles.subTableContainer}>
-              <View style={styles.tableHeaderRow}>
-                <Text style={[styles.headerText, { flex: 1, textAlign: 'left', paddingLeft: 10 }]}>NAVARSU / KASU</Text>
-                <Text style={[styles.headerText, { flex: 1, textAlign: 'right', paddingRight: 10 }]}>8 GRAMS</Text>
-              </View>
-
-
-              <View style={styles.tableBody}>
-                <View style={[styles.retailRow, { borderBottomWidth: 0 }]}>
-                  <Text style={[styles.retailColText, { flex: 1, textAlign: 'left', paddingLeft: 10 }]}>Gold 22KT</Text>
-                  <AnimatedRateText
-                    style={[styles.retailColRate, { flex: 1, textAlign: 'right', paddingRight: 10 }]}
-                    value={calculateKaratRate(currentRates['945']?.ask, 0.916, 8)}
-                    trend={getRateChangeType('945')}
-                  />
-                </View>
-              </View>
-            </View>
-
-            {/* Silver Table */}
-            <View style={styles.subTableContainer}>
-              <View style={styles.tableHeaderRow}>
-                <Text style={[styles.headerText, { flex: 1, textAlign: 'left', paddingLeft: 10 }]}>SILVER</Text>
-                <Text style={[styles.headerText, { flex: 1, textAlign: 'right', paddingRight: 10 }]}>10 GRAMS</Text>
-              </View>
-
-              <View style={styles.tableBody}>
-                <View style={[styles.retailRow, { borderBottomWidth: 0 }]}>
-                  <Text style={[styles.retailColText, { flex: 1, textAlign: 'left', paddingLeft: 10 }]}>Silver 999</Text>
-                  <AnimatedRateText
-                    style={[styles.retailColRate, { flex: 1, textAlign: 'right', paddingRight: 10 }]}
-                    value={(() => {
-                        const silver = currentRates['2987']?.ask; // Base KG
-                        if (!silver || silver === '-') return '--';
-                        let val = parseFloat(silver.replace(/,/g, ''));
-                        if (isNaN(val)) return '--';
-                        
-                        // Apply mods if needed (similar to getSilverRate)
-                        const mods = settings.ratesPageModifications;
-                        if (mods?.isModifiedMode && mods.silver999) {
-                            val += Number(mods.silver999);
-                        }
-                        
-                        const per10g = Math.round(val / 100);
-                        return '\u20B9' + per10g.toLocaleString('en-IN');
-                    })()}
-                    trend={getRateChangeType('2987')}
-                    defaultColor="#CFE9E1"
-                  />
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.musicButtonWrap}>
-              <TouchableOpacity
-                style={[styles.musicButton, isMusicOn ? styles.musicButtonOn : styles.musicButtonOff]}
-                onPress={toggleMusic}
-                activeOpacity={0.85}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <FontAwesome
-                  name="music"
-                  size={22}
-                  color={isMusicOn ? '#FFFFFF' : '#1e293b'}
-                  style={styles.musicButtonIcon}
-                />
-                <Text style={[styles.musicButtonText, isMusicOn ? styles.musicButtonTextOn : styles.musicButtonTextOff]}>
-                  {isMusicOn ? 'MUSIC ON' : 'MUSIC OFF'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
         </ScrollView>
-
-      </ImageBackground>
+        {isLoading && !refreshing && (
+          <View style={styles.loadingOverlay} pointerEvents="none">
+            <ActivityIndicator size="large" color={GOLD_COLOR} />
+          </View>
+        )}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#1A0B2E',
-  },
-  bgImage: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-  },
-  scrollView: {
-    width: '100%',
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 130,
-  },
-  headerImage: {
-    width: width,
-    height: undefined,
-  },
-  tickerContainer: {
-    width: '100%',
-    alignItems: 'center',
-  },
-  tickerImage: {
-    width: '100%',
-    height: undefined,
-  },
-  tickerText: {
-    color: '#FFF',
-    fontSize: 14,
-    fontWeight: '900',
-    letterSpacing: 2,
-    marginRight: 0,
-  },
-  tableSection: {
-    width: '100%',
-    paddingHorizontal: 20,
-    marginTop: 25,
-  },
-  tableTitleText: {
-    fontSize: 16,
-    fontWeight: '900',
-    color: '#FFF',
-    letterSpacing: 1,
-    textAlign: 'center',
-    marginBottom: 15,
-  },
-  tableContainer: {
-    backgroundColor: 'rgba(0, 0, 0, 0.15)',
-    borderRadius: 15,
-    overflow: 'hidden',
-  },
-  subTableContainer: {
-    backgroundColor: 'rgba(0, 0, 0, 0.15)',
-    borderRadius: 15,
-    overflow: 'hidden',
-    marginTop: 18,
-  },
-  tableHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    backgroundColor: '#A0155B',
-    paddingVertical: 12,
-    paddingHorizontal: 15,
-  },
-  headerText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#FFF',
-    letterSpacing: 1,
-  },
-  tableBody: {
-    paddingHorizontal: 15,
-    paddingBottom: 5,
-  },
-  retailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 18,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
-  },
-  retailColText: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    color: '#FFF',
-  },
-  retailColRate: {
-    fontSize: 14,
-    fontWeight: '900',
-    color: '#F0C733', 
-    letterSpacing: 0.5,
-  },
-  musicButtonWrap: {
-    width: '100%',
-    alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 10,
-  },
-  musicButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  container: { flex: 1, backgroundColor: 'black' },
+  webViewWrapper: { flex: 1, backgroundColor: 'black' },
+  webView: { flex: 1, backgroundColor: 'black' },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.3)',
     justifyContent: 'center',
-    borderRadius: 999,
-    borderWidth: 2,
-    paddingHorizontal: 28,
-    paddingVertical: 14,
-    minWidth: width * 0.62,
-  },
-  musicButtonOn: {
-    backgroundColor: '#db2777',
-    borderColor: '#be185d',
-  },
-  musicButtonOff: {
-    backgroundColor: '#FFFFFF',
-    borderColor: 'rgba(30, 41, 59, 0.12)',
-  },
-  musicButtonIcon: {
-    marginRight: 10,
-  },
-  musicButtonText: {
-    fontSize: 18,
-    fontWeight: '900',
-    letterSpacing: 1,
-  },
-  musicButtonTextOn: {
-    color: '#FFFFFF',
-  },
-  musicButtonTextOff: {
-    color: '#1e293b',
+    alignItems: 'center',
+    zIndex: 10,
   },
   offlineContainer: {
+    flex: 1,
+    backgroundColor: 'black',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
   offlineTitle: {
-    color: '#FFF',
-    fontSize: 22,
-    fontWeight: '900',
-    marginBottom: 8,
+    color: 'white',
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 10,
   },
   offlineSubTitle: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 14,
+    color: '#888',
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 30,
   },
   retryButton: {
-    backgroundColor: '#F0C733',
-    paddingHorizontal: 30,
+    backgroundColor: GOLD_COLOR,
+    paddingHorizontal: 40,
     paddingVertical: 12,
     borderRadius: 25,
   },
   retryText: {
-    color: '#000',
+    color: 'black',
     fontWeight: 'bold',
     fontSize: 16,
   },
