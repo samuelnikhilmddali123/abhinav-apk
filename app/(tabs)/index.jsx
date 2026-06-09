@@ -59,11 +59,26 @@ const injectedJS = `
       body.style.paddingTop = "1px";
       body.style.paddingBottom = "100px";
     }
-    // Allow zoom
-    const meta = document.createElement('meta');
-    meta.name = 'viewport';
-    meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes';
-    document.getElementsByTagName('head')[0].appendChild(meta);
+    
+    function updateViewport() {
+      let meta = document.querySelector('meta[name="viewport"]');
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.name = 'viewport';
+        document.head.appendChild(meta);
+      }
+      
+      const isLandscape = window.innerWidth > window.innerHeight;
+      if (isLandscape) {
+        meta.content = 'width=1200, user-scalable=yes';
+      } else {
+        meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes';
+      }
+    }
+    
+    updateViewport();
+    window.addEventListener('resize', updateViewport);
+    window.addEventListener('orientationchange', updateViewport);
   }
   allowLayoutFix();
 
@@ -182,6 +197,7 @@ export default function HomeScreen() {
             scalesPageToFit={true}
             setBuiltInZoomControls={true}
             setDisplayZoomControls={false}
+            userAgent="Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1"
           />
         </ScrollView>
         {isLoading && !refreshing && (
