@@ -4,11 +4,11 @@
     "slug": "jewllery-expo",
     "version": "1.0.0",
     "orientation": "default",
-    "icon": "./assets/images/Untitled design (2).png",
+    "icon": "./assets/images/Untitled design (4).png",
     "scheme": "jewelryexpo",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/images/Untitled design (2).png",
+      "image": "./assets/images/Untitled design (4).png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -19,7 +19,7 @@
       "predictiveBackGestureEnabled": false,
       "package": "abhinav.com",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/Untitled design (2).png",
+        "foregroundImage": "./assets/images/Untitled design (4).png",
         "backgroundColor": "#000000"
       }
     },

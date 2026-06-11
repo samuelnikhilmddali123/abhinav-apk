@@ -1,7 +1,7 @@
 import { StyleSheet, View, ImageBackground, StatusBar, Image, Animated, Text, Easing, Dimensions, ScrollView, TouchableOpacity, Linking, Platform, Modal, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
-import { useRef, useEffect, useState } from 'react';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import { FontAwesome, FontAwesome5, Ionicons } from '@expo/vector-icons';
 import { useSettings } from '../../context/SettingsContext';
 import { useNetInfo } from '@react-native-community/netinfo';
@@ -76,26 +76,32 @@ export default function AlertsScreen() {
       .slice(0, 15);
   };
 
-  useEffect(() => {
-    const fetchNews = async () => {
-      try {
-        const res = await fetch('https://www.investing.com/rss/news.rss');
-        if (res.ok) {
-          const xml = await res.text();
-          const parsed = parseNews(xml);
-          if (parsed && parsed.length > 0) {
-            setNews(parsed);
-          }
+  const fetchNews = useCallback(async () => {
+    try {
+      const res = await fetch('https://www.investing.com/rss/news.rss');
+      if (res.ok) {
+        const xml = await res.text();
+        const parsed = parseNews(xml);
+        if (parsed && parsed.length > 0) {
+          setNews(parsed);
         }
-      } catch (err) {
-        console.log('Failed to fetch news:', err);
       }
-    };
+    } catch (err) {
+      console.log('Failed to fetch news:', err);
+    }
+  }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      fetchNews();
+    }, [fetchNews])
+  );
+
+  useEffect(() => {
     fetchNews();
     const interval = setInterval(fetchNews, 60000 * 5); // Update every 5 minutes
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchNews]);
 
   useEffect(() => {
     if (tickerWidth > 0) {

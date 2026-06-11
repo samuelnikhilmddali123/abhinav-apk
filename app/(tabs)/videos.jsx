@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { 
   StyleSheet, 
   View, 
@@ -109,6 +110,19 @@ export default function VideosScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [isAtTop, setIsAtTop] = useState(true);
+  const isFirstLoad = useRef(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (isFirstLoad.current) {
+        isFirstLoad.current = false;
+        return;
+      }
+      if (webViewRef.current) {
+        webViewRef.current.reload();
+      }
+    }, [])
+  );
 
   useEffect(() => {
     const ni = (NetInfo.default || NetInfo);
